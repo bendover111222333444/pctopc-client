@@ -10,7 +10,7 @@ const config = {
 
 async function generateCreds() {
 
-    const response = await fetch("https://speed.cloudflare.com/turn-creds") // I would love to use cloudflares 
+    const response = await fetch("https://pctopc.sigmasigmaonthewallwhoisthe2.workers.dev/turn-creds") // this could break in the future if it becomes deprecated.
     const creds = await response.json()
 
     config = {
