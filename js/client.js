@@ -2,7 +2,7 @@ const sendButton = document.getElementById("sendBtn");
 const txtInput = document.getElementById("textInput")
 const videoEle = document.getElementById("videoPlayer");
 
-const config = {
+let config = {
     iceServers: [
          { urls: "stun:stun.l.google.com:19302" },
     ]
