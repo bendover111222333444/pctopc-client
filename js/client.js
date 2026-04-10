@@ -1,21 +1,84 @@
-const startBtn = document.getElementById("startBtn");
-const stopBtn = document.getElementById("stopBtn");
+const sendButton = document.getElementById("sendBtn");
+const txtInput = document.getElementById("textInput")
 const videoEle = document.getElementById("videoPlayer");
 
-async function startCapture() {
+const config = {
+    iceServers: [
+         { urls: "stun:stun.l.google.com:19302" },
+    ]
+}
+
+async function generateCreds() {
+
+    const response = await fetch("https://speed.cloudflare.com/turn-creds") // I would love to use cloudflares 
+    const creds = await response.json()
+
+    config = {
+        iceServers: [
+            { urls: "stun:stun.l.google.com:19302" },
+            {
+                urls: creds.iceServers.urls,
+                username: creds.iceServers.username,
+                credential: creds.iceServers.credential
+            }
+        ]
+    }
+
+}
+
+generateCreds();
+
+let pConn = new RTCPeerConnection(config);
+let started = false;
+
+async function connectToCapture(roomId) {
 
     try {
 
-        const capture = await navigator.mediaDevices.getDisplayMedia({video: true, audio: false});
+        const serverSocket = new WebSocket(`wss://pctopc.sigmasigmaonthewallwhoisthe2.workers.dev?room=${roomId}`)
 
-        videoEle.srcObject = capture;
+        await new Promise(resolve => serverSocket.onopen = resolve);
 
-        capture.getVideoTracks()[0].onended(function () {
-           
-            stopCapturing(capture);
+        pConn.ontrack = evt => {
+
+            evt.receiver.jitterBufferTarget = 0
+            videoEle.srcObject = evt.streams[0]
+        
+        }
+
+        serverSocket.onmessage = async msg => {
             
-        });
+            const data = JSON.parse(msg.data);
+            if (data.type && data.actualData) {
 
+                if ( data.type == "offer") {
+
+                    await pConn.setRemoteDescription(data.actualData);
+
+                    const answer = await pConn.createAnswer();
+                    await pConn.setLocalDescription(answer);
+
+                    serverSocket.send(JSON.stringify({type: "answer", actualData: answer}));
+
+                } else if (data.type == "ICE") {
+
+                    data.actualData.forEach(candidate => pConn.addIceCandidate(candidate))
+                
+                }
+
+            }
+
+        };
+
+        pConn.onicecandidate = iceCandidate => {
+
+            if (iceCandidate.candidate) {
+            
+                serverSocket.send(JSON.stringify({type: "ICE", actualData: iceCandidate.candidate}));
+
+            }
+
+        };
 
     } catch (err) {
 
@@ -25,26 +88,14 @@ async function startCapture() {
 
 }
 
-function stopCapturing(capture) {
-            
-    capture.getTracks().forEach(function(track){
-               
-        track.stop();
-                
-    });
+sendButton.addEventListener("click", () => {
+   
+    const roomId = txtInput.value;
 
-    videoEle.srcObject = null;
-        
-}
+    if (roomId) {
 
-startBtn.addEventListener("click", function(){
-    
-    startCapture();
+        connectToCapture(roomId);
 
-});
+    }
 
-stopBtn.addEventListener("click", function(){
-    
-    stopCapture();
-
-});
+})
