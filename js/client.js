@@ -17,9 +17,9 @@ async function generateCreds() {
         iceServers: [
             { urls: "stun:stun.l.google.com:19302" },
             {
-                urls: creds.iceServers.urls,
-                username: creds.iceServers.username,
-                credential: creds.iceServers.credential
+                urls: creds.urls,
+                username: creds.username,
+                credential: creds.credential
             }
         ]
     }
