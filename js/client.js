@@ -28,8 +28,16 @@ async function generateCreds() {
 
 generateCreds();
 
+const mousePollRate = 1 / 10;
+
 let pConn = new RTCPeerConnection(config);
 let started = false;
+let fps = 60;
+
+let mxPos = 0;
+let myPos = 0;
+let pmxPos = 0;
+let pmyPos = 0;
 
 async function connectToCapture(roomId) {
 
@@ -44,6 +52,73 @@ async function connectToCapture(roomId) {
             evt.receiver.jitterBufferTarget = 0
             videoEle.srcObject = evt.streams[0]
         
+        }
+
+        pConn.ondatachannel = evt => {
+
+            const inputChannel = evt.channel;
+
+            inputChannel.onopen = () => {
+
+                console.log("opened channel")
+
+                document.addEventListener("keydown", (event) => {
+
+                    console.log("key down")
+
+                    inputChannel.send(JSON.stringify({inputType: "key", release: false, keyType: event.key}))
+
+                });
+
+                document.addEventListener("keyup", (event) => {
+
+                    console.log("key up")
+
+                    inputChannel.send(JSON.stringify({inputType: "key", release: true, keyType: event.key}))
+
+                });
+                
+                videoEle.addEventListener("mousemove", (event) => {
+
+                    mxPos = event.offsetX;
+                    myPos = event.offsetY;
+
+                });
+
+                videoEle.addEventListener("mousedown", (event) => {
+
+                    console.log("click down")
+
+                    inputChannel.send(JSON.stringify({inputType: "click", clickType: event.button, release: false}))
+
+                });
+
+                videoEle.addEventListener("mouseup", (event) => {
+
+                    console.log("click up")
+
+                    inputChannel.send(JSON.stringify({inputType: "click", clickType: event.button, release: true}))
+
+                });
+
+                setInterval(() => {
+                    
+                    if ((pmxPos !== mxPos) || (pmyPos !== myPos)) {
+                        
+                        pmxPos = mxPos;
+                        pmyPos = myPos;
+
+                        console.log("moving mice")
+
+                        inputChannel.send(JSON.stringify({inputType: "moveMouse", xPos: (mxPos / videoEle.offsetWidth) * 1920, yPos: (myPos / videoEle.offsetHeight) * 1080}))
+
+                    }
+
+
+                }, mousePollRate);
+
+            }
+
         }
 
         serverSocket.onmessage = async msg => {
