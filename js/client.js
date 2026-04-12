@@ -10,7 +10,7 @@ let config = {
 
 async function generateCreds() {
 
-    const response = await fetch("https://pctopc.sigmasigmaonthewallwhoisthe2.workers.dev/turn-creds") // this could break in the future if it becomes deprecated.
+    const response = await fetch("https://pctopc.sigmasigmaonthewallwhoisthe2.workers.dev/turn-creds") // this could break in the future if it becomes deprecated and also dont use it just use there offical service its just because im poor and i dont have access to a offical credit card
     const creds = await response.json()
 
     config = {
@@ -28,9 +28,15 @@ async function generateCreds() {
 
 generateCreds();
 
+(async () => {
+
+    await generateCreds();
+    pConn = new RTCPeerConnection(config);
+
+})();
+
 const mousePollRate = 1 / 10;
 
-let pConn = new RTCPeerConnection(config);
 let started = false;
 let fps = 60;
 
@@ -49,6 +55,7 @@ let screenSizeY = 1080;
 // add good ui
 // add shut down button / key
 // add stun then if not work switch to turn
+// add mobile full support
 
 async function connectToCapture(roomId) {
 
@@ -66,11 +73,12 @@ async function connectToCapture(roomId) {
 
             videoEle.srcObject = stream
 
-            const track = stream.getVideoTracks()[0];
-            const settings = track.getSettings();
+            videoEle.addEventListener('loadedmetadata', () => {
 
-            screenSizeX = settings.width;
-            screenSizeY = settings.height;
+                screenSizeX = videoEle.videoWidth;
+                screenSizeY = videoEle.videoHeight;
+
+            });
 
         }
 
@@ -100,16 +108,35 @@ async function connectToCapture(roomId) {
                 });
 
                 videoEle.addEventListener("mousedown", (event) => {
+                                            
+                    let xPos = 0;
+                    let yPos = 0;
 
-                    const xPos = (mxPos / videoEle.offsetWidth) * screenSizeX;
-                    const yPos = (myPos / videoEle.offsetHeight) * screenSizeY;
+                    if ((pmxPos !== mxPos) || (pmyPos !== myPos)) {
 
-                    if (xPos || yPos) {
+                        mxPos = event.offsetX;
+                        myPos = event.offsetY;
+                  
+                        pmxPos = mxPos;
+                        pmyPos = myPos;
 
-                        inputChannel.send(JSON.stringify({inputType: "moveMouse", xPos: xPos, yPos: yPos}))
-                        inputChannel.send(JSON.stringify({inputType: "click", clickType: event.button, release: false}))
+                        if (mxPos !== 0) {
+                            xPos = (mxPos / videoEle.offsetWidth) * screenSizeX;
+                        }
+
+                        if (myPos !== 0) {
+                            yPos = (myPos / videoEle.offsetHeight) * screenSizeY;
+                        }
                     
+                    } else {
+
+                        xPos = pmxPos;
+                        yPos = pmyPos;
+
                     }
+
+                    inputChannel.send(JSON.stringify({inputType: "moveMouse", xPos: xPos, yPos: yPos}))
+                    inputChannel.send(JSON.stringify({inputType: "click", clickType: event.button, release: false}))
 
                 });
 
@@ -126,14 +153,18 @@ async function connectToCapture(roomId) {
                         pmxPos = mxPos;
                         pmyPos = myPos;
 
-                        const xPos = (mxPos / videoEle.offsetWidth) * screenSizeX;
-                        const yPos = (myPos / videoEle.offsetHeight) * screenSizeY;
+                        let xPos = 0;
+                        let yPos = 0;
 
-                        if (xPos || yPos) {
-
-                            inputChannel.send(JSON.stringify({inputType: "moveMouse", xPos: xPos, yPos: yPos}))
-                        
+                        if (mxPos !== 0) {
+                            xPos = (mxPos / videoEle.offsetWidth) * screenSizeX;
                         }
+
+                        if (myPos !== 0) {
+                            yPos = (myPos / videoEle.offsetHeight) * screenSizeY;
+                        }
+
+                        inputChannel.send(JSON.stringify({inputType: "moveMouse", xPos: xPos, yPos: yPos}))
 
                      }
 
