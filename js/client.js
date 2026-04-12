@@ -101,8 +101,15 @@ async function connectToCapture(roomId) {
 
                 videoEle.addEventListener("mousedown", (event) => {
 
-                    inputChannel.send(JSON.stringify({inputType: "moveMouse", xPos: (mxPos / videoEle.offsetWidth) * screenSizeX, yPos: (myPos / videoEle.offsetHeight) * screenSizeY}))
-                    inputChannel.send(JSON.stringify({inputType: "click", clickType: event.button, release: false}))
+                    const xPos = (mxPos / videoEle.offsetWidth) * screenSizeX;
+                    const yPos = (myPos / videoEle.offsetHeight) * screenSizeY;
+
+                    if (xPos || yPos) {
+
+                        inputChannel.send(JSON.stringify({inputType: "moveMouse", xPos: xPos, yPos: yPos}))
+                        inputChannel.send(JSON.stringify({inputType: "click", clickType: event.button, release: false}))
+                    
+                    }
 
                 });
 
@@ -119,12 +126,16 @@ async function connectToCapture(roomId) {
                         pmxPos = mxPos;
                         pmyPos = myPos;
 
-                        console.log("moving mice")
+                        const xPos = (mxPos / videoEle.offsetWidth) * screenSizeX;
+                        const yPos = (myPos / videoEle.offsetHeight) * screenSizeY;
 
-                        inputChannel.send(JSON.stringify({inputType: "moveMouse", xPos: (mxPos / videoEle.offsetWidth) * screenSizeX, yPos: (myPos / videoEle.offsetHeight) * screenSizeY}))
+                        if (xPos || yPos) {
 
-                    }
+                            inputChannel.send(JSON.stringify({inputType: "moveMouse", xPos: xPos, yPos: yPos}))
+                        
+                        }
 
+                     }
 
                 }, mousePollRate);
 
