@@ -80,19 +80,13 @@ async function connectToCapture(roomId) {
 
             inputChannel.onopen = () => {
 
-                console.log("opened channel")
-
                 document.addEventListener("keydown", (event) => {
-
-                    console.log("key down")
 
                     inputChannel.send(JSON.stringify({inputType: "key", release: false, keyType: event.key}))
 
                 });
 
                 document.addEventListener("keyup", (event) => {
-
-                    console.log("key up")
 
                     inputChannel.send(JSON.stringify({inputType: "key", release: true, keyType: event.key}))
 
@@ -107,15 +101,12 @@ async function connectToCapture(roomId) {
 
                 videoEle.addEventListener("mousedown", (event) => {
 
-                    console.log("click down")
-
+                    inputChannel.send(JSON.stringify({inputType: "moveMouse", xPos: (mxPos / videoEle.offsetWidth) * screenSizeX, yPos: (myPos / videoEle.offsetHeight) * screenSizeY}))
                     inputChannel.send(JSON.stringify({inputType: "click", clickType: event.button, release: false}))
 
                 });
 
                 videoEle.addEventListener("mouseup", (event) => {
-
-                    console.log("click up")
 
                     inputChannel.send(JSON.stringify({inputType: "click", clickType: event.button, release: true}))
 
