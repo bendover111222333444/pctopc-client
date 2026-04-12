@@ -39,6 +39,17 @@ let myPos = 0;
 let pmxPos = 0;
 let pmyPos = 0;
 
+let screenSizeX = 1920;
+let screenSizeY = 1080;
+
+// todo:
+// add mac support
+// fix screen changing and breaking mouse pos
+// make reconnection work
+// add good ui
+// add shut down button / key
+// add stun then if not work switch to turn
+
 async function connectToCapture(roomId) {
 
     try {
@@ -50,8 +61,17 @@ async function connectToCapture(roomId) {
         pConn.ontrack = evt => {
 
             evt.receiver.jitterBufferTarget = 0
-            videoEle.srcObject = evt.streams[0]
-        
+
+            const stream = evt.streams[0];
+
+            videoEle.srcObject = stream
+
+            const track = stream.getVideoTracks()[0];
+            const settings = track.getSettings();
+
+            screenSizeX = settings.width;
+            screenSizeY = settings.height;
+
         }
 
         pConn.ondatachannel = evt => {
@@ -110,7 +130,7 @@ async function connectToCapture(roomId) {
 
                         console.log("moving mice")
 
-                        inputChannel.send(JSON.stringify({inputType: "moveMouse", xPos: (mxPos / videoEle.offsetWidth) * 1920, yPos: (myPos / videoEle.offsetHeight) * 1080}))
+                        inputChannel.send(JSON.stringify({inputType: "moveMouse", xPos: (mxPos / videoEle.offsetWidth) * screenSizeX, yPos: (myPos / videoEle.offsetHeight) * screenSizeY}))
 
                     }
 
