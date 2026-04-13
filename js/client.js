@@ -35,7 +35,7 @@ async function generateCreds() {
 
 }
 
-function mouseClick(event) {
+function mouseClick(event, inChannel) {
     
     let xPos = 0;
     let yPos = 0;
@@ -63,9 +63,9 @@ function mouseClick(event) {
 
     }
 
-    if (inputChannel.readyState === "open") {
+    if (inChannel.readyState === "open") {
 
-        inputChannel.send(JSON.stringify({inputType: "moveMouse", xPos: xPos, yPos: yPos}))
+        inChannel.send(JSON.stringify({inputType: "moveMouse", xPos: xPos, yPos: yPos}))
 
     }
 
@@ -116,8 +116,6 @@ async function connectToCapture(roomId) {
         serverSocket = new WebSocket(`wss://pctopc.sigmasigmaonthewallwhoisthe2.workers.dev?room=${roomId}`)
 
         await new Promise(resolve => serverSocket.onopen = resolve);
-
-        console.log("socket connected")
 
         pConn.ontrack = evt => {
 
