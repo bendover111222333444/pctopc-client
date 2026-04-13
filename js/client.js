@@ -106,6 +106,7 @@ let screenSizeY = 1080;
 // add mobile full support
 // add proper error messages
 // get best decoding method
+// add toggle capture here
 
 async function connectToCapture(roomId) {
 
@@ -294,33 +295,39 @@ async function connectToCapture(roomId) {
 
 async function stopCapture() {
     
-    started = false;
+    if (started == true) {
 
-    if (pConn) {
+        started = false;
 
-        pConn.close();
-        pConn = null;
+        if (pConn) {
 
-        pConn = new RTCPeerConnection(config)
+            pConn.close();
+            pConn = null;
+
+            pConn = new RTCPeerConnection(config)
+
+        }
+
+        if (serverSocket) {
+
+            serverSocket.close();
+            serverSocket = null;
+
+        }
+
+        videoEle.srcObject = null;
 
     }
-
-    if (serverSocket) {
-
-        serverSocket.close();
-        serverSocket = null;
-
-    }
-
-    videoEle.srcObject = null;
 
 }
 
-sendButton.addEventListener("click", () => {
-   
+function startCapture() {
+
     const roomId = (txtInput.value).trim();
 
-    if (roomId) {
+    if (roomId && started == false) {
+
+        started = true;
 
         connectToCapture(roomId);
 
@@ -328,6 +335,12 @@ sendButton.addEventListener("click", () => {
 
     txtInput.value = "";
 
+}
+
+sendButton.addEventListener("click", () => {
+
+    startCapture();
+    
 });
 
 closeButton.addEventListener("click", () => {
