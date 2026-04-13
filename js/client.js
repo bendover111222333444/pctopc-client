@@ -1,5 +1,6 @@
 const sendButton = document.getElementById("sendBtn");
-const txtInput = document.getElementById("textInput")
+const closeButton = document.getElementById("closeBtn");
+const txtInput = document.getElementById("textInput");
 const videoEle = document.getElementById("videoPlayer");
 
 let config = {
@@ -62,7 +63,11 @@ function mouseClick(event) {
 
     }
 
-    inputChannel.send(JSON.stringify({inputType: "moveMouse", xPos: xPos, yPos: yPos}))
+    if (inputChannel.readyState === "open") {
+
+        inputChannel.send(JSON.stringify({inputType: "moveMouse", xPos: xPos, yPos: yPos}))
+
+    }
 
 }
 
@@ -96,10 +101,11 @@ let screenSizeY = 1080;
 // todo:
 // add mac support
 // fix screen changing and breaking mouse pos
-// make reconnection work
 // add good ui
 // add shut down button key binds and generally key binds
 // add mobile full support
+// add proper error messages
+// get best decoding method
 
 async function connectToCapture(roomId) {
 
@@ -108,6 +114,8 @@ async function connectToCapture(roomId) {
         serverSocket = new WebSocket(`wss://pctopc.sigmasigmaonthewallwhoisthe2.workers.dev?room=${roomId}`)
 
         await new Promise(resolve => serverSocket.onopen = resolve);
+
+        console.log("socket connected")
 
         pConn.ontrack = evt => {
 
@@ -134,14 +142,22 @@ async function connectToCapture(roomId) {
 
                 document.addEventListener("keydown", (event) => {
 
-                    inputChannel.send(JSON.stringify({inputType: "key", release: false, keyType: event.key}))
+                    if (inputChannel.readyState === "open") {
+
+                        inputChannel.send(JSON.stringify({inputType: "key", release: false, keyType: event.key}))
+
+                    }
 
                 });
 
                 document.addEventListener("keyup", (event) => {
 
-                    inputChannel.send(JSON.stringify({inputType: "key", release: true, keyType: event.key}))
+                    if (inputChannel.readyState === "open") {
 
+                        inputChannel.send(JSON.stringify({inputType: "key", release: true, keyType: event.key}))
+
+                    }
+                    
                 });
                 
                 videoEle.addEventListener("mousemove", (event) => {
@@ -155,7 +171,11 @@ async function connectToCapture(roomId) {
                                             
                     mouseClick(event);
 
-                    inputChannel.send(JSON.stringify({inputType: "click", clickType: event.button, release: false}))
+                    if (inputChannel.readyState === "open") {
+
+                        inputChannel.send(JSON.stringify({inputType: "click", clickType: event.button, release: false}))
+
+                    }
 
                 });
 
@@ -163,7 +183,11 @@ async function connectToCapture(roomId) {
 
                     mouseClick(event);
 
-                    inputChannel.send(JSON.stringify({inputType: "click", clickType: event.button, release: true}))
+                    if (inputChannel.readyState === "open") {
+
+                        inputChannel.send(JSON.stringify({inputType: "click", clickType: event.button, release: true}))
+
+                    }
 
                 });
 
@@ -191,7 +215,11 @@ async function connectToCapture(roomId) {
                             yPos = (myPos / videoEle.offsetHeight) * screenSizeY;
                         }
 
-                        inputChannel.send(JSON.stringify({inputType: "moveMouse", xPos: xPos, yPos: yPos}))
+                        if (inputChannel.readyState === "open") {
+
+                            inputChannel.send(JSON.stringify({inputType: "moveMouse", xPos: xPos, yPos: yPos}))
+
+                        }
 
                     } 
                     
@@ -201,7 +229,11 @@ async function connectToCapture(roomId) {
 
                         totalScroll = 0;
 
-                        inputChannel.send(JSON.stringify({inputType: "click", clickType: 3, scrollDistance: finalScroll}))
+                        if (inputChannel.readyState === "open") {
+
+                            inputChannel.send(JSON.stringify({inputType: "click", clickType: 3, scrollDistance: finalScroll}))
+
+                        }
 
                     }
 
@@ -214,6 +246,7 @@ async function connectToCapture(roomId) {
         serverSocket.onmessage = async msg => {
             
             const data = JSON.parse(msg.data);
+
             if (data.type && data.actualData) {
 
                 if ( data.type == "offer") {
@@ -295,4 +328,10 @@ sendButton.addEventListener("click", () => {
 
     txtInput.value = "";
 
-})
+});
+
+closeButton.addEventListener("click", () => {
+
+    stopCapture();
+
+});
