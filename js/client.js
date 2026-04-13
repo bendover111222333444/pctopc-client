@@ -3,9 +3,13 @@ const txtInput = document.getElementById("textInput")
 const videoEle = document.getElementById("videoPlayer");
 
 let config = {
+
     iceServers: [
+
          { urls: "stun:stun.l.google.com:19302" },
+    
     ]
+
 }
 
 async function generateCreds() {
@@ -14,19 +18,57 @@ async function generateCreds() {
     const creds = await response.json()
 
     config = {
+
         iceServers: [
+
             { urls: "stun:stun.l.google.com:19302" },
+            
             {
                 urls: creds.urls,
                 username: creds.username,
                 credential: creds.credential
             }
         ]
+
     }
 
 }
 
+function mouseClick(event) {
+    
+    let xPos = 0;
+    let yPos = 0;
+
+    if ((pmxPos !== mxPos) || (pmyPos !== myPos)) {
+
+        mxPos = event.offsetX;
+        myPos = event.offsetY;
+                    
+        pmxPos = mxPos;
+        pmyPos = myPos;
+
+        if (mxPos !== 0) {
+            xPos = (mxPos / videoEle.offsetWidth) * screenSizeX;
+        }
+
+        if (myPos !== 0) {
+            yPos = (myPos / videoEle.offsetHeight) * screenSizeY;
+        }
+                    
+    } else {
+
+        xPos = pmxPos;
+        yPos = pmyPos;
+
+    }
+
+    inputChannel.send(JSON.stringify({inputType: "moveMouse", xPos: xPos, yPos: yPos}))
+
+}
+
 generateCreds();
+
+let pConn;
 
 (async () => {
 
@@ -37,6 +79,7 @@ generateCreds();
 
 const mousePollRate = 1 / 10;
 
+let serverSocket;
 let started = false;
 let fps = 60;
 
@@ -44,6 +87,8 @@ let mxPos = 0;
 let myPos = 0;
 let pmxPos = 0;
 let pmyPos = 0;
+
+let totalScroll = 0;
 
 let screenSizeX = 1920;
 let screenSizeY = 1080;
@@ -53,15 +98,14 @@ let screenSizeY = 1080;
 // fix screen changing and breaking mouse pos
 // make reconnection work
 // add good ui
-// add shut down button / key
-// add stun then if not work switch to turn
+// add shut down button key binds and generally key binds
 // add mobile full support
 
 async function connectToCapture(roomId) {
 
     try {
 
-        const serverSocket = new WebSocket(`wss://pctopc.sigmasigmaonthewallwhoisthe2.workers.dev?room=${roomId}`)
+        serverSocket = new WebSocket(`wss://pctopc.sigmasigmaonthewallwhoisthe2.workers.dev?room=${roomId}`)
 
         await new Promise(resolve => serverSocket.onopen = resolve);
 
@@ -109,40 +153,23 @@ async function connectToCapture(roomId) {
 
                 videoEle.addEventListener("mousedown", (event) => {
                                             
-                    let xPos = 0;
-                    let yPos = 0;
+                    mouseClick(event);
 
-                    if ((pmxPos !== mxPos) || (pmyPos !== myPos)) {
-
-                        mxPos = event.offsetX;
-                        myPos = event.offsetY;
-                  
-                        pmxPos = mxPos;
-                        pmyPos = myPos;
-
-                        if (mxPos !== 0) {
-                            xPos = (mxPos / videoEle.offsetWidth) * screenSizeX;
-                        }
-
-                        if (myPos !== 0) {
-                            yPos = (myPos / videoEle.offsetHeight) * screenSizeY;
-                        }
-                    
-                    } else {
-
-                        xPos = pmxPos;
-                        yPos = pmyPos;
-
-                    }
-
-                    inputChannel.send(JSON.stringify({inputType: "moveMouse", xPos: xPos, yPos: yPos}))
                     inputChannel.send(JSON.stringify({inputType: "click", clickType: event.button, release: false}))
 
                 });
 
                 videoEle.addEventListener("mouseup", (event) => {
 
+                    mouseClick(event);
+
                     inputChannel.send(JSON.stringify({inputType: "click", clickType: event.button, release: true}))
+
+                });
+
+                videoEle.addEventListener("wheel", (event) => {
+
+                    totalScroll += event.deltaY;
 
                 });
 
@@ -166,7 +193,17 @@ async function connectToCapture(roomId) {
 
                         inputChannel.send(JSON.stringify({inputType: "moveMouse", xPos: xPos, yPos: yPos}))
 
-                     }
+                    } 
+                    
+                    if (totalScroll !== 0){
+
+                        const finalScroll = totalScroll;
+
+                        totalScroll = 0;
+
+                        inputChannel.send(JSON.stringify({inputType: "click", clickType: 3, scrollDistance: finalScroll}))
+
+                    }
 
                 }, mousePollRate);
 
@@ -208,6 +245,12 @@ async function connectToCapture(roomId) {
 
         };
 
+        serverSocket.onclose = () => {
+            
+            stopCapture();
+
+        }
+
     } catch (err) {
 
         console.log(err);
@@ -216,14 +259,40 @@ async function connectToCapture(roomId) {
 
 }
 
+async function stopCapture() {
+    
+    started = false;
+
+    if (pConn) {
+
+        pConn.close();
+        pConn = null;
+
+        pConn = new RTCPeerConnection(config)
+
+    }
+
+    if (serverSocket) {
+
+        serverSocket.close();
+        serverSocket = null;
+
+    }
+
+    videoEle.srcObject = null;
+
+}
+
 sendButton.addEventListener("click", () => {
    
-    const roomId = txtInput.value;
+    const roomId = (txtInput.value).trim();
 
     if (roomId) {
 
         connectToCapture(roomId);
 
     }
+
+    txtInput.value = "";
 
 })
