@@ -3,6 +3,24 @@ const closeButton = document.getElementById("closeBtn");
 const txtInput = document.getElementById("textInput");
 const videoEle = document.getElementById("videoPlayer");
 
+const mousePollRate = 1 / 10;
+
+let serverSocket;
+let pConn;
+let inputChannel;
+let started = false;
+let fps = 60;
+
+let mxPos = 0;
+let myPos = 0;
+let pmxPos = 0;
+let pmyPos = 0;
+
+let totalScroll = 0;
+
+let screenSizeX = 1920;
+let screenSizeY = 1080;
+
 let config = {
 
     iceServers: [
@@ -35,68 +53,53 @@ async function generateCreds() {
 
 }
 
-function mouseClick(event, inChannel) {
+function mouseClick(event) {
     
-    let xPos = 0;
-    let yPos = 0;
+    if (inputChannel) {
 
-    if ((pmxPos !== mxPos) || (pmyPos !== myPos)) {
+        let xPos = 0;
+        let yPos = 0;
 
-        mxPos = event.offsetX;
-        myPos = event.offsetY;
-                    
-        pmxPos = mxPos;
-        pmyPos = myPos;
+        if ((pmxPos !== mxPos) || (pmyPos !== myPos)) {
 
-        if (mxPos !== 0) {
-            xPos = (mxPos / videoEle.offsetWidth) * screenSizeX;
+            mxPos = event.offsetX;
+            myPos = event.offsetY;
+                        
+            pmxPos = mxPos;
+            pmyPos = myPos;
+
+            if (mxPos !== 0) {
+                xPos = (mxPos / videoEle.offsetWidth) * screenSizeX;
+            }
+
+            if (myPos !== 0) {
+                yPos = (myPos / videoEle.offsetHeight) * screenSizeY;
+            }
+                        
+        } else {
+
+            xPos = pmxPos;
+            yPos = pmyPos;
+
         }
 
-        if (myPos !== 0) {
-            yPos = (myPos / videoEle.offsetHeight) * screenSizeY;
+        if (inputChannel && inputChannel.readyState === "open") {
+
+            inputChannel.send(JSON.stringify({inputType: "moveMouse", xPos: xPos, yPos: yPos}))
+
         }
-                    
-    } else {
-
-        xPos = pmxPos;
-        yPos = pmyPos;
-
-    }
-
-    if (inChannel.readyState === "open") {
-
-        inChannel.send(JSON.stringify({inputType: "moveMouse", xPos: xPos, yPos: yPos}))
-
+    
     }
 
 }
 
 generateCreds();
 
-let pConn;
-
 (async () => {
 
     await generateCreds();
-    pConn = new RTCPeerConnection(config);
 
 })();
-
-const mousePollRate = 1 / 10;
-
-let serverSocket;
-let started = false;
-let fps = 60;
-
-let mxPos = 0;
-let myPos = 0;
-let pmxPos = 0;
-let pmyPos = 0;
-
-let totalScroll = 0;
-
-let screenSizeX = 1920;
-let screenSizeY = 1080;
 
 // todo:
 // add mac support
@@ -113,10 +116,12 @@ async function connectToCapture(roomId) {
 
     try {
 
+        pConn = new RTCPeerConnection(config)
+
         serverSocket = new WebSocket(`wss://pctopc.sigmasigmaonthewallwhoisthe2.workers.dev?room=${roomId}`)
-
+        
         await new Promise(resolve => serverSocket.onopen = resolve);
-
+        
         pConn.ontrack = evt => {
 
             evt.receiver.jitterBufferTarget = 0
@@ -136,111 +141,8 @@ async function connectToCapture(roomId) {
 
         pConn.ondatachannel = evt => {
 
-            const inputChannel = evt.channel;
-
-            inputChannel.onopen = () => {
-
-                document.addEventListener("keydown", (event) => {
-
-                    if (inputChannel.readyState === "open") {
-
-                        inputChannel.send(JSON.stringify({inputType: "key", release: false, keyType: event.key}))
-
-                    }
-
-                });
-
-                document.addEventListener("keyup", (event) => {
-
-                    if (inputChannel.readyState === "open") {
-
-                        inputChannel.send(JSON.stringify({inputType: "key", release: true, keyType: event.key}))
-
-                    }
-                    
-                });
-                
-                videoEle.addEventListener("mousemove", (event) => {
-
-                    mxPos = event.offsetX;
-                    myPos = event.offsetY;
-
-                });
-
-                videoEle.addEventListener("mousedown", (event) => {
-                                            
-                    mouseClick(event);
-
-                    if (inputChannel.readyState === "open") {
-
-                        inputChannel.send(JSON.stringify({inputType: "click", clickType: event.button, release: false}))
-
-                    }
-
-                });
-
-                videoEle.addEventListener("mouseup", (event) => {
-
-                    mouseClick(event);
-
-                    if (inputChannel.readyState === "open") {
-
-                        inputChannel.send(JSON.stringify({inputType: "click", clickType: event.button, release: true}))
-
-                    }
-
-                });
-
-                videoEle.addEventListener("wheel", (event) => {
-
-                    totalScroll += event.deltaY;
-
-                });
-
-                setInterval(() => {
-                    
-                    if ((pmxPos !== mxPos) || (pmyPos !== myPos)) {
-                        
-                        pmxPos = mxPos;
-                        pmyPos = myPos;
-
-                        let xPos = 0;
-                        let yPos = 0;
-
-                        if (mxPos !== 0) {
-                            xPos = (mxPos / videoEle.offsetWidth) * screenSizeX;
-                        }
-
-                        if (myPos !== 0) {
-                            yPos = (myPos / videoEle.offsetHeight) * screenSizeY;
-                        }
-
-                        if (inputChannel.readyState === "open") {
-
-                            inputChannel.send(JSON.stringify({inputType: "moveMouse", xPos: xPos, yPos: yPos}))
-
-                        }
-
-                    } 
-                    
-                    if (totalScroll !== 0){
-
-                        const finalScroll = totalScroll;
-
-                        totalScroll = 0;
-
-                        if (inputChannel.readyState === "open") {
-
-                            inputChannel.send(JSON.stringify({inputType: "click", clickType: 3, scrollDistance: finalScroll}))
-
-                        }
-
-                    }
-
-                }, mousePollRate);
-
-            }
-
+            inputChannel = evt.channel;
+        
         }
 
         serverSocket.onmessage = async msg => {
@@ -303,8 +205,6 @@ async function stopCapture() {
             pConn.close();
             pConn = null;
 
-            pConn = new RTCPeerConnection(config)
-
         }
 
         if (serverSocket) {
@@ -347,3 +247,102 @@ closeButton.addEventListener("click", async () => {
     await stopCapture();
 
 });
+
+document.addEventListener("keydown", (event) => {
+
+    if (inputChannel && inputChannel.readyState === "open") {
+
+        inputChannel.send(JSON.stringify({inputType: "key", release: false, keyType: event.key}))
+
+    }
+
+});
+
+document.addEventListener("keyup", (event) => {
+
+    if (inputChannel && inputChannel.readyState === "open") {
+
+        inputChannel.send(JSON.stringify({inputType: "key", release: true, keyType: event.key}))
+
+    }
+    
+});
+
+videoEle.addEventListener("mousemove", (event) => {
+
+    mxPos = event.offsetX;
+    myPos = event.offsetY;
+
+});
+
+videoEle.addEventListener("mousedown", (event) => {
+                            
+    mouseClick(event);
+
+    if (inputChannel && inputChannel.readyState === "open") {
+
+        inputChannel.send(JSON.stringify({inputType: "click", clickType: event.button, release: false}))
+
+    }
+
+});
+
+videoEle.addEventListener("mouseup", (event) => {
+
+    mouseClick(event);
+
+    if (inputChannel && inputChannel.readyState === "open") {
+
+        inputChannel.send(JSON.stringify({inputType: "click", clickType: event.button, release: true}))
+
+    }
+
+});
+
+videoEle.addEventListener("wheel", (event) => {
+
+    totalScroll += event.deltaY;
+
+});
+
+setInterval(() => {
+    
+    if ((pmxPos !== mxPos) || (pmyPos !== myPos)) {
+        
+        pmxPos = mxPos;
+        pmyPos = myPos;
+
+        let xPos = 0;
+        let yPos = 0;
+
+        if (mxPos !== 0) {
+            xPos = (mxPos / videoEle.offsetWidth) * screenSizeX;
+        }
+
+        if (myPos !== 0) {
+            yPos = (myPos / videoEle.offsetHeight) * screenSizeY;
+        }
+
+        if (inputChannel && inputChannel.readyState === "open") {
+
+            inputChannel.send(JSON.stringify({inputType: "moveMouse", xPos: xPos, yPos: yPos}))
+
+        }
+
+    } 
+    
+    if (totalScroll !== 0){
+
+        const finalScroll = totalScroll;
+
+        totalScroll = 0;
+
+        if (inputChannel && inputChannel.readyState === "open") {
+
+            inputChannel.send(JSON.stringify({inputType: "click", clickType: 3, scrollDistance: finalScroll}))
+
+        }
+
+    }
+
+}, mousePollRate);
