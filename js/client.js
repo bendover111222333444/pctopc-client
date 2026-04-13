@@ -107,6 +107,7 @@ let screenSizeY = 1080;
 // add proper error messages
 // get best decoding method
 // add toggle capture here
+// fix random websockets not connecting
 
 async function connectToCapture(roomId) {
 
@@ -279,9 +280,9 @@ async function connectToCapture(roomId) {
 
         };
 
-        serverSocket.onclose = () => {
+        serverSocket.onclose = async() => {
             
-            stopCapture();
+            await stopCapture();
 
         }
 
@@ -321,7 +322,7 @@ async function stopCapture() {
 
 }
 
-function startCapture() {
+async function startCapture() {
 
     const roomId = (txtInput.value).trim();
 
@@ -329,7 +330,7 @@ function startCapture() {
 
         started = true;
 
-        connectToCapture(roomId);
+        await connectToCapture(roomId);
 
     }
 
@@ -337,14 +338,14 @@ function startCapture() {
 
 }
 
-sendButton.addEventListener("click", () => {
+sendButton.addEventListener("click", async () => {
 
-    startCapture();
+    await startCapture();
     
 });
 
-closeButton.addEventListener("click", () => {
+closeButton.addEventListener("click", async () => {
 
-    stopCapture();
+    await stopCapture();
 
 });
