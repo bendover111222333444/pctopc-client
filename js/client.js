@@ -140,7 +140,12 @@ async function connectToCapture(roomId) {
                 screenSizeX = videoEle.videoWidth;
                 screenSizeY = videoEle.videoHeight;
 
+                videoEle.style.width = videoEle.videoWidth + "px"
+                videoEle.style.height = videoEle.videoHeight + "px"
+
             });
+
+            videoEle.
 
         }
 
