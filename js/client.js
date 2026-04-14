@@ -165,6 +165,16 @@ async function connectToCapture(roomId) {
 
                     serverSocket.send(JSON.stringify({type: "answer", actualData: answer}));
 
+                    const sender = pConn.getSenders().find(s => s.track && s.track.kind === "video")
+                    
+                    if (sender) {
+
+                        const params = sender.getParameters()
+                        params.encodings[0].maxBitrate = 5000000
+                        await sender.setParameters(params)
+                    
+                    }
+
                 } else if (data.type == "ICE") {
 
                     data.actualData.forEach(candidate => pConn.addIceCandidate(candidate))
