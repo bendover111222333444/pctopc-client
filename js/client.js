@@ -147,7 +147,7 @@ async function connectToCapture(roomId) {
         pConn.ondatachannel = evt => {
 
             inputChannel = evt.channel;
-        
+
         }
 
         serverSocket.onmessage = async msg => {
@@ -257,7 +257,17 @@ document.addEventListener("keydown", (event) => {
 
     if (inputChannel && inputChannel.readyState === "open") {
 
-        inputChannel.send(JSON.stringify({inputType: "key", release: false, keyType: event.key}))
+        if (event.key !== "CapsLock") {
+            
+            inputChannel.send(JSON.stringify({inputType: "key", release: false, keyType: event.key}))
+
+        } else {
+
+            inputChannel.send(JSON.stringify({inputType: "key", release: false, keyType: event.key}))
+            inputChannel.send(JSON.stringify({inputType: "key", release: true, keyType: event.key}))
+
+        }
+
 
     }
 
@@ -265,7 +275,7 @@ document.addEventListener("keydown", (event) => {
 
 document.addEventListener("keyup", (event) => {
 
-    if (inputChannel && inputChannel.readyState === "open") {
+    if (inputChannel && inputChannel.readyState === "open" && event.key !== "CapsLock") {
 
         inputChannel.send(JSON.stringify({inputType: "key", release: true, keyType: event.key}))
 
@@ -312,37 +322,33 @@ videoEle.addEventListener("wheel", (event) => {
 
 setInterval(() => {
     
-    if ((pmxPos !== mxPos) || (pmyPos !== myPos)) {
-        
-        pmxPos = mxPos;
-        pmyPos = myPos;
+    if (inputChannel && inputChannel.readyState === "open") {
 
-        let xPos = 0;
-        let yPos = 0;
+        if ((pmxPos !== mxPos) || (pmyPos !== myPos)) {
+            
+            pmxPos = mxPos;
+            pmyPos = myPos;
 
-        if (mxPos !== 0) {
-            xPos = (mxPos / videoEle.offsetWidth) * screenSizeX;
-        }
+            let xPos = 0;
+            let yPos = 0;
 
-        if (myPos !== 0) {
-            yPos = (myPos / videoEle.offsetHeight) * screenSizeY;
-        }
+            if (mxPos !== 0) {
+                xPos = (mxPos / videoEle.offsetWidth) * screenSizeX;
+            }
 
-        if (inputChannel && inputChannel.readyState === "open") {
+            if (myPos !== 0) {
+                yPos = (myPos / videoEle.offsetHeight) * screenSizeY;
+            }
 
             inputChannel.send(JSON.stringify({inputType: "moveMouse", xPos: xPos, yPos: yPos}))
 
-        }
+        } 
+        
+        if (totalScroll !== 0){
 
-    } 
-    
-    if (totalScroll !== 0){
+            const finalScroll = totalScroll;
 
-        const finalScroll = totalScroll;
-
-        totalScroll = 0;
-
-        if (inputChannel && inputChannel.readyState === "open") {
+            totalScroll = 0;
 
             inputChannel.send(JSON.stringify({inputType: "click", clickType: 3, scrollDistance: finalScroll}))
 
