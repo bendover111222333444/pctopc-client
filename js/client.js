@@ -145,8 +145,6 @@ async function connectToCapture(roomId) {
 
             });
 
-            videoEle.
-
         }
 
         pConn.ondatachannel = evt => {
