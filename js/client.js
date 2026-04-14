@@ -57,13 +57,13 @@ function mouseClick(event) {
     
     if (inputChannel) {
 
+        mxPos = event.offsetX;
+        myPos = event.offsetY;
+
         let xPos = 0;
         let yPos = 0;
 
         if ((pmxPos !== mxPos) || (pmyPos !== myPos)) {
-
-            mxPos = event.offsetX;
-            myPos = event.offsetY;
                         
             pmxPos = mxPos;
             pmyPos = myPos;
@@ -78,8 +78,13 @@ function mouseClick(event) {
                         
         } else {
 
-            xPos = pmxPos;
-            yPos = pmyPos;
+            if (pmxPos !== 0) {
+                xPos = (pmxPos / videoEle.offsetWidth) * screenSizeX;
+            }
+
+            if (pmyPos !== 0) {
+                yPos = (pmyPos / videoEle.offsetHeight) * screenSizeY;
+            }
 
         }
 
