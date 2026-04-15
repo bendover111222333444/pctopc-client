@@ -306,10 +306,6 @@ document.addEventListener("keydown", (event) => {
         }
 
 
-    } else {
-
-        errorEle.value += "Input channel missing\n";
-
     }
 
 });
@@ -319,10 +315,6 @@ document.addEventListener("keyup", (event) => {
     if (inputChannel && inputChannel.readyState === "open" && event.key !== "CapsLock") {
 
         inputChannel.send(JSON.stringify({inputType: "key", release: true, keyType: event.key}))
-
-    } else {
-
-        errorEle.value += "Input channel missing\n";
 
     }
     
@@ -346,10 +338,6 @@ videoEle.addEventListener("mousedown", (event) => {
 
         inputChannel.send(JSON.stringify({inputType: "click", clickType: event.button, release: false}))
 
-    } else {
-
-        errorEle.value += "Input channel missing\n";
-
     }
 
 });
@@ -361,10 +349,6 @@ videoEle.addEventListener("mouseup", (event) => {
     if (inputChannel && inputChannel.readyState === "open") {
 
         inputChannel.send(JSON.stringify({inputType: "click", clickType: event.button, release: true}))
-
-    } else {
-
-        errorEle.value += "Input channel missing\n";
 
     }
 
@@ -384,6 +368,6 @@ setInterval(() => {
 
 setInterval(() => {
     
-    errorEle.value = "";
+   errorEle.value = "";
 
 }, errorClearTime)
