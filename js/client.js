@@ -7,12 +7,13 @@ const setScaleEle = document.getElementById("setScaleBtn");
 const errorEle = document.getElementById("errorBox");
 
 const mousePollRate = 10; // in ms
+const errorClearTime = 60000; // ms
+const maxBRate = 20000000; // in bytes
 
 let serverSocket;
 let pConn;
 let inputChannel;
 let started = false;
-let fps = 60;
 
 let mxPos = 0;
 let myPos = 0;
@@ -56,8 +57,6 @@ async function generateCreds() {
 
 }
 
-generateCreds();
-
 (async () => {
 
     await generateCreds();
@@ -68,7 +67,8 @@ generateCreds();
 // add mac support
 // add good ui
 // add shut down button key binds and generally key binds
-// add proper error messages
+// add custom fps
+// add app closing warning
 
 async function connectToCapture(roomId) {
 
@@ -103,7 +103,12 @@ async function connectToCapture(roomId) {
                     screenSizeX = data.width;
                     screenSizeY = data.height;
 
+                } else {
+
+                    errorEle.value += "Wrong data type\n";
+
                 }
+
             }
 
         }
@@ -137,6 +142,10 @@ async function connectToCapture(roomId) {
 
                             transceiver.setCodecPreferences([...preferred, ...rest]);
                         
+                        } else {
+
+                            errorEle.value += "Transceiver doesnt exist\n";
+
                         }
                     
                     });
@@ -151,11 +160,15 @@ async function connectToCapture(roomId) {
                     if (sender) {
 
                         const params = sender.getParameters()
-                        params.encodings[0].maxBitrate = 20000000
+                        params.encodings[0].maxBitrate = maxBRate
                         params.encodings[0].networkPriority = "high"
                         params.encodings[0].priority = "high"
                         await sender.setParameters(params)
                     
+                    } else {
+
+                        errorEle.value += "Sender doesnt exist\n";
+
                     }
 
                 } else if (data.type == "ICE") {
@@ -163,6 +176,10 @@ async function connectToCapture(roomId) {
                     data.actualData.forEach(candidate => pConn.addIceCandidate(candidate))
                 
                 }
+
+            } else {
+
+                errorEle.value += "Wrong data types and actual data\n";
 
             }
 
@@ -186,7 +203,7 @@ async function connectToCapture(roomId) {
 
     } catch (err) {
 
-        console.log(err);
+        errorEle.value += err + "\n";
     
     }
 
@@ -289,6 +306,10 @@ document.addEventListener("keydown", (event) => {
         }
 
 
+    } else {
+
+        errorEle.value += "Input channel missing\n";
+
     }
 
 });
@@ -298,6 +319,10 @@ document.addEventListener("keyup", (event) => {
     if (inputChannel && inputChannel.readyState === "open" && event.key !== "CapsLock") {
 
         inputChannel.send(JSON.stringify({inputType: "key", release: true, keyType: event.key}))
+
+    } else {
+
+        errorEle.value += "Input channel missing\n";
 
     }
     
@@ -321,6 +346,10 @@ videoEle.addEventListener("mousedown", (event) => {
 
         inputChannel.send(JSON.stringify({inputType: "click", clickType: event.button, release: false}))
 
+    } else {
+
+        errorEle.value += "Input channel missing\n";
+
     }
 
 });
@@ -333,6 +362,10 @@ videoEle.addEventListener("mouseup", (event) => {
 
         inputChannel.send(JSON.stringify({inputType: "click", clickType: event.button, release: true}))
 
+    } else {
+
+        errorEle.value += "Input channel missing\n";
+
     }
 
 });
@@ -344,5 +377,13 @@ videoEle.addEventListener("wheel", (event) => {
 });
 
 setInterval(() => {
+
     mousePacket();
+
 }, mousePollRate);
+
+setInterval(() => {
+    
+    errorEle.value = "";
+
+}, errorClearTime)
