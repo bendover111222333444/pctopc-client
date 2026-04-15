@@ -2,8 +2,11 @@ const sendButton = document.getElementById("sendBtn");
 const closeButton = document.getElementById("closeBtn");
 const txtInput = document.getElementById("textInput");
 const videoEle = document.getElementById("videoPlayer");
+const scaleEle = document.getElementById("scale");
+const setScaleEle = document.getElementById("setScaleBtn");
+const errorEle = document.getElementById("errorBox");
 
-const mousePollRate = 1 / 10;
+const mousePollRate = 10; // in ms
 
 let serverSocket;
 let pConn;
@@ -18,8 +21,8 @@ let pmyPos = 0;
 
 let totalScroll = 0;
 
-let screenSizeX = 1920;
-let screenSizeY = 1080;
+let screenSizeX = 3840;
+let screenSizeY = 2160;
 
 let config = {
 
@@ -53,51 +56,6 @@ async function generateCreds() {
 
 }
 
-function mouseClick(event) {
-    
-    if (inputChannel) {
-
-        mxPos = event.offsetX;
-        myPos = event.offsetY;
-
-        let xPos = 0;
-        let yPos = 0;
-
-        if ((pmxPos !== mxPos) || (pmyPos !== myPos)) {
-                        
-            pmxPos = mxPos;
-            pmyPos = myPos;
-
-            if (mxPos !== 0) {
-                xPos = (mxPos / videoEle.offsetWidth) * screenSizeX;
-            }
-
-            if (myPos !== 0) {
-                yPos = (myPos / videoEle.offsetHeight) * screenSizeY;
-            }
-                        
-        } else {
-
-            if (pmxPos !== 0) {
-                xPos = (pmxPos / videoEle.offsetWidth) * screenSizeX;
-            }
-
-            if (pmyPos !== 0) {
-                yPos = (pmyPos / videoEle.offsetHeight) * screenSizeY;
-            }
-
-        }
-
-        if (inputChannel && inputChannel.readyState === "open") {
-
-            inputChannel.send(JSON.stringify({inputType: "moveMouse", xPos: xPos, yPos: yPos}))
-
-        }
-    
-    }
-
-}
-
 generateCreds();
 
 (async () => {
@@ -108,14 +66,9 @@ generateCreds();
 
 // todo:
 // add mac support
-// fix screen changing and breaking mouse pos
 // add good ui
 // add shut down button key binds and generally key binds
-// add mobile full support
 // add proper error messages
-// get best decoding method
-// add toggle capture here
-// fix random websockets not connecting
 
 async function connectToCapture(roomId) {
 
@@ -135,21 +88,23 @@ async function connectToCapture(roomId) {
 
             videoEle.srcObject = stream
 
-            videoEle.addEventListener('loadedmetadata', () => {
-
-                screenSizeX = videoEle.videoWidth;
-                screenSizeY = videoEle.videoHeight;
-
-                videoEle.style.width = videoEle.videoWidth + "px"
-                videoEle.style.height = videoEle.videoHeight + "px"
-
-            });
-
         }
 
         pConn.ondatachannel = evt => {
 
             inputChannel = evt.channel;
+            
+            inputChannel.onmessage = msg => {
+                
+                const data = JSON.parse(msg.data);
+
+                if (data.type == "screen-size") {
+                    
+                    screenSizeX = data.width;
+                    screenSizeY = data.height;
+
+                }
+            }
 
         }
 
@@ -162,6 +117,29 @@ async function connectToCapture(roomId) {
                 if ( data.type == "offer") {
 
                     await pConn.setRemoteDescription(data.actualData);
+                    
+                    const transceivers = pConn.getTransceivers();
+
+                    transceivers.forEach(transceiver => {
+                        
+                        if (transceiver.receiver.track?.kind === "video") {
+                            
+                            const codecs = RTCRtpReceiver.getCapabilities("video").codecs;
+                            
+                            const preferred = codecs.filter(c => 
+                                c.mimeType === "video/H264" && 
+                                c.sdpFmtpLine?.includes("profile-level-id=42")
+                            );
+
+                            const rest = codecs.filter(c => 
+                                !(c.mimeType === "video/H264" && c.sdpFmtpLine?.includes("profile-level-id=42"))
+                            );
+
+                            transceiver.setCodecPreferences([...preferred, ...rest]);
+                        
+                        }
+                    
+                    });
 
                     const answer = await pConn.createAnswer();
                     await pConn.setLocalDescription(answer);
@@ -173,7 +151,9 @@ async function connectToCapture(roomId) {
                     if (sender) {
 
                         const params = sender.getParameters()
-                        params.encodings[0].maxBitrate = 5000000
+                        params.encodings[0].maxBitrate = 20000000
+                        params.encodings[0].networkPriority = "high"
+                        params.encodings[0].priority = "high"
                         await sender.setParameters(params)
                     
                     }
@@ -208,6 +188,33 @@ async function connectToCapture(roomId) {
 
         console.log(err);
     
+    }
+
+}
+
+function mousePacket() {
+        
+    if (inputChannel && inputChannel.readyState === "open") {
+
+        if ((pmxPos !== mxPos) || (pmyPos !== myPos)) {
+            
+            pmxPos = mxPos;
+            pmyPos = myPos;
+
+            inputChannel.send(JSON.stringify({inputType: "moveMouse", xPos: mxPos, yPos: myPos}))
+
+        } 
+        
+        if (totalScroll !== 0){
+
+            const finalScroll = totalScroll;
+
+            totalScroll = 0;
+
+            inputChannel.send(JSON.stringify({inputType: "click", clickType: 3, scrollDistance: finalScroll}))
+
+        }
+
     }
 
 }
@@ -298,14 +305,17 @@ document.addEventListener("keyup", (event) => {
 
 videoEle.addEventListener("mousemove", (event) => {
 
-    mxPos = event.offsetX;
-    myPos = event.offsetY;
+    const scaleX = screenSizeX / videoEle.clientWidth;
+    const scaleY = screenSizeY / videoEle.clientHeight;
+    
+    mxPos = event.offsetX * scaleX;
+    myPos = event.offsetY * scaleY;
 
 });
 
 videoEle.addEventListener("mousedown", (event) => {
                             
-    mouseClick(event);
+    mousePacket();
 
     if (inputChannel && inputChannel.readyState === "open") {
 
@@ -317,7 +327,7 @@ videoEle.addEventListener("mousedown", (event) => {
 
 videoEle.addEventListener("mouseup", (event) => {
 
-    mouseClick(event);
+    mousePacket();
 
     if (inputChannel && inputChannel.readyState === "open") {
 
@@ -334,39 +344,5 @@ videoEle.addEventListener("wheel", (event) => {
 });
 
 setInterval(() => {
-    
-    if (inputChannel && inputChannel.readyState === "open") {
-
-        if ((pmxPos !== mxPos) || (pmyPos !== myPos)) {
-            
-            pmxPos = mxPos;
-            pmyPos = myPos;
-
-            let xPos = 0;
-            let yPos = 0;
-
-            if (mxPos !== 0) {
-                xPos = (mxPos / videoEle.offsetWidth) * screenSizeX;
-            }
-
-            if (myPos !== 0) {
-                yPos = (myPos / videoEle.offsetHeight) * screenSizeY;
-            }
-
-            inputChannel.send(JSON.stringify({inputType: "moveMouse", xPos: xPos, yPos: yPos}))
-
-        } 
-        
-        if (totalScroll !== 0){
-
-            const finalScroll = totalScroll;
-
-            totalScroll = 0;
-
-            inputChannel.send(JSON.stringify({inputType: "click", clickType: 3, scrollDistance: finalScroll}))
-
-        }
-
-    }
-
+    mousePacket();
 }, mousePollRate);
