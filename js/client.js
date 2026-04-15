@@ -8,7 +8,10 @@ const errorEle = document.getElementById("errorBox");
 
 const mousePollRate = 10; // in ms
 const errorClearTime = 60000; // ms
-const maxBRate = 20000000; // in bytes
+const videoBufferClear = 100 // ms
+
+const maxBRate = 5000000; // in bytes
+const minBRate = 2000000; // in bytes
 
 let serverSocket;
 let pConn;
@@ -69,6 +72,9 @@ async function generateCreds() {
 // add shut down button key binds and generally key binds
 // add custom fps
 // add app closing warning
+// fix shitty ass h243 or someehting
+// add mouse center lock keybind thing
+// fps counter
 
 async function connectToCapture(roomId) {
 
@@ -87,6 +93,20 @@ async function connectToCapture(roomId) {
             const stream = evt.streams[0];
 
             videoEle.srcObject = stream
+
+            setInterval(() => {
+
+                if (videoEle.buffered.length > 0) {
+                    
+                    const diff = videoEle.buffered.end(0) - videoEle.currentTime;
+                    
+                    if (diff > 0.1) {
+                        videoEle.currentTime = videoEle.buffered.end(0) - 0.05;
+                    }
+
+                }
+
+            }, videoBufferClear);
 
         }
 
@@ -141,10 +161,6 @@ async function connectToCapture(roomId) {
                             );
 
                             transceiver.setCodecPreferences([...preferred, ...rest]);
-                        
-                        } else {
-
-                            errorEle.value += "Transceiver doesnt exist\n";
 
                         }
                     
@@ -160,6 +176,7 @@ async function connectToCapture(roomId) {
                     if (sender) {
 
                         const params = sender.getParameters()
+                        params.encodings[0].minBitrate = minBRate
                         params.encodings[0].maxBitrate = maxBRate
                         params.encodings[0].networkPriority = "high"
                         params.encodings[0].priority = "high"
