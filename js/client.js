@@ -5,10 +5,16 @@ const videoEle = document.getElementById("videoPlayer");
 const scaleEle = document.getElementById("scale");
 const setScaleEle = document.getElementById("setScaleBtn");
 const errorEle = document.getElementById("errorBox");
+const pointerBtn = document.getElementById("pointerBtn");
+const fullScreenBtn = document.getElementById("fullScreenBtn");
+const pointScreenBtn = document.getElementById("pointScreenBtn");
 
 const mousePollRate = 10; // in ms
 const errorClearTime = 60000; // ms
+const websocketPing = 20000; // also ms
 const videoBufferClear = 100 // ms
+
+const fullScreenStyle = "fullscreen-overlay"
 
 const maxBRate = 5000000; // in bytes
 const minBRate = 2000000; // in bytes
@@ -71,10 +77,10 @@ async function generateCreds() {
 // add good ui
 // add shut down button key binds and generally key binds
 // add custom fps
-// add app closing warning
-// fix shitty ass h243 or someehting
-// add mouse center lock keybind thing
 // fps counter
+// add cookies to renember user
+// fix random disconnects (maybe fixed)
+// add back the origin thing
 
 async function connectToCapture(roomId) {
 
@@ -111,6 +117,8 @@ async function connectToCapture(roomId) {
         }
 
         pConn.ondatachannel = evt => {
+
+            console.log("data channel established")
 
             inputChannel = evt.channel;
             
@@ -181,10 +189,6 @@ async function connectToCapture(roomId) {
                         params.encodings[0].networkPriority = "high"
                         params.encodings[0].priority = "high"
                         await sender.setParameters(params)
-                    
-                    } else {
-
-                        errorEle.value += "Sender doesnt exist\n";
 
                     }
 
@@ -211,6 +215,16 @@ async function connectToCapture(roomId) {
             }
 
         };
+
+        setInterval(() => {
+
+            if (serverSocket && serverSocket.readyState === WebSocket.OPEN) {
+                
+                serverSocket.send(JSON.stringify({ type: "ping" }));
+            
+            }
+        
+        }, websocketPing);
 
         serverSocket.onclose = async() => {
             
@@ -311,17 +325,21 @@ document.addEventListener("keydown", (event) => {
 
     if (inputChannel && inputChannel.readyState === "open") {
 
-        if (event.key !== "CapsLock") {
-            
-            inputChannel.send(JSON.stringify({inputType: "key", release: false, keyType: event.key}))
+        if (event.key == "\\") {
 
+            allowExit = true
+            videoEle.classList.remove(fullScreenStyle)
+
+        } else if (event.key !== "CapsLock") {
+
+            inputChannel.send(JSON.stringify({inputType: "key", release: false, keyType: event.key}))
+        
         } else {
 
             inputChannel.send(JSON.stringify({inputType: "key", release: false, keyType: event.key}))
             inputChannel.send(JSON.stringify({inputType: "key", release: true, keyType: event.key}))
 
         }
-
 
     }
 
@@ -339,11 +357,19 @@ document.addEventListener("keyup", (event) => {
 
 videoEle.addEventListener("mousemove", (event) => {
 
-    const scaleX = screenSizeX / videoEle.clientWidth;
-    const scaleY = screenSizeY / videoEle.clientHeight;
+    if (document.pointerLockElement == videoEle) {
+
+        mxPos = Math.max(0, Math.min(screenSizeX, mxPos + event.movementX));
+        myPos = Math.max(0, Math.min(screenSizeY, myPos + event.movementY));
     
-    mxPos = event.offsetX * scaleX;
-    myPos = event.offsetY * scaleY;
+    } else {
+
+        const scaleX = screenSizeX / videoEle.clientWidth;
+        const scaleY = screenSizeY / videoEle.clientHeight;
+        mxPos = event.offsetX * scaleX;
+        myPos = event.offsetY * scaleY;
+    
+    }
 
 });
 
@@ -370,6 +396,68 @@ videoEle.addEventListener("mouseup", (event) => {
     }
 
 });
+
+pointerBtn.addEventListener("click", () => {
+
+    if (!document.pointerLockElement) {
+
+        videoEle.requestPointerLock();
+    
+    } else {
+
+        document.exitPointerLock()
+
+    }
+
+});
+
+fullScreenBtn.addEventListener("click", () => {
+    
+    if (!videoEle.classList.contains(fullScreenStyle)) {
+        
+        videoEle.classList.add(fullScreenStyle)
+    
+    } else {
+        
+        videoEle.classList.remove(fullScreenStyle)
+    
+    }
+
+});
+
+pointScreenBtn.addEventListener("click", () => {
+
+    if (!videoEle.classList.contains(fullScreenStyle)) {
+        
+        videoEle.requestPointerLock();
+        videoEle.classList.add(fullScreenStyle)
+        
+    } else {
+        
+        document.exitPointerLock()
+        videoEle.classList.remove(fullScreenStyle)
+    
+    }
+
+});
+
+document.addEventListener('pointerlockchange', () => {
+
+    if (!document.pointerLockElement) {       
+
+        if (allowExit) {
+        
+            allowExit = false
+        
+        } else {
+        
+            videoEle.requestPointerLock()
+        
+        }
+  
+    }
+
+})
 
 videoEle.addEventListener("wheel", (event) => {
 
