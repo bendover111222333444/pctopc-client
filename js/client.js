@@ -16,13 +16,14 @@ const videoBufferClear = 100 // ms
 
 const fullScreenStyle = "fullscreen-overlay"
 
-const maxBRate = 5000000; // in bytes
+const maxBRate = 50000000; // in bytes
 const minBRate = 2000000; // in bytes
 
 let serverSocket;
 let pConn;
 let inputChannel;
 let started = false;
+let allowExit = false;
 
 let mxPos = 0;
 let myPos = 0;
@@ -81,6 +82,7 @@ async function generateCreds() {
 // add cookies to renember user
 // fix random disconnects (maybe fixed)
 // add back the origin thing
+// fix fullscreen and pointer
 
 async function connectToCapture(roomId) {
 
