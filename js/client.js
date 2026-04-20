@@ -10,18 +10,16 @@ const fullScreenBtn = document.getElementById("fullScreenBtn");
 const pointScreenBtn = document.getElementById("pointScreenBtn");
 
 const mousePollRate = 10; // in ms
-const errorClearTime = 60000; // ms
-const websocketPing = 20000; // also ms
-const videoBufferClear = 100 // ms
+const errorClearTime = 60_000; // ms
+const websocketPing = 20_000; // also ms
 
-const fullScreenStyle = "fullscreen-overlay"
-
-const maxBRate = 50000000; // in bytes
-const minBRate = 2000000; // in bytes
+const fullScreenStyle = "fullscreen-thing"
 
 let serverSocket;
+let decoder;
 let pConn;
 let inputChannel;
+let videoChannel;
 let started = false;
 let allowExit = false;
 
@@ -34,6 +32,16 @@ let totalScroll = 0;
 
 let screenSizeX = 3840;
 let screenSizeY = 2160;
+let videoAspect = screenSizeX / screenSizeY
+
+const decoderSettings = {
+
+    codec: 'avc1.640033',
+    optimizeForLatency: true,
+    hardwareAcceleration: 'prefer-hardware',
+    avc: { format: 'annexb' }
+
+}
 
 let config = {
 
@@ -84,6 +92,8 @@ async function generateCreds() {
 // add back the origin thing
 // fix fullscreen and pointer
 
+// Commented out shiz is depricated stuff
+
 async function connectToCapture(roomId) {
 
     try {
@@ -93,49 +103,139 @@ async function connectToCapture(roomId) {
         serverSocket = new WebSocket(`wss://pctopc.sigmasigmaonthewallwhoisthe2.workers.dev?room=${roomId}`)
         
         await new Promise(resolve => serverSocket.onopen = resolve);
-        
+
         pConn.ontrack = evt => {
 
-            evt.receiver.jitterBufferTarget = 0
+            if (evt.track.kind === 'audio') {
 
-            const stream = evt.streams[0];
+                const audio = new Audio()
+                audio.srcObject = new MediaStream([evt.track])
+                audio.play()
 
-            videoEle.srcObject = stream
+            }
 
-            setInterval(() => {
+        }
 
-                if (videoEle.buffered.length > 0) {
-                    
-                    const diff = videoEle.buffered.end(0) - videoEle.currentTime;
-                    
-                    if (diff > 0.1) {
-                        videoEle.currentTime = videoEle.buffered.end(0) - 0.05;
+        pConn.ondatachannel = event => {
+            
+           if (event.channel.label === 'video') {
+
+            videoChannel = event.channel
+            videoChannel.binaryType = 'arraybuffer'
+
+            const generator = new MediaStreamTrackGenerator({ kind: 'video' })
+            const writer = generator.writable.getWriter()
+
+            videoEle.srcObject = new MediaStream([generator])
+
+            decoder = new VideoDecoder({
+
+                output: (frame) => {
+
+                    writer.write(frame)
+                    frame.close()
+
+                },
+
+                error: (err) => errorEle.value += err + '\n'
+
+            })
+
+            decoder.configure(decoderSettings)
+
+            let pendingHeader = null
+            let frameBuffer = null
+
+            let frameOffset = 0
+
+            let gotKeyframe = false
+
+            videoChannel.onmessage = msg => {
+
+                if (msg.data instanceof ArrayBuffer) {
+
+                    if (!pendingHeader) {
+
+                        const view = new DataView(msg.data)
+
+                        pendingHeader = {
+
+                            isKey: view.getUint8(0) === 1,
+                            timestamp: view.getFloat64(1),
+                            totalSize: view.getUint32(9)
+
+                        }
+                        
+                        frameBuffer = new Uint8Array(pendingHeader.totalSize)
+                        frameOffset = 0
+
+                    } else {
+
+                        const chunk = new Uint8Array(msg.data)
+
+                        frameBuffer.set(chunk, frameOffset)
+                        frameOffset += chunk.byteLength
+
+                        if (frameOffset >= pendingHeader.totalSize) {
+
+                            if (!pendingHeader.isKey && !gotKeyframe) {
+
+                                pendingHeader = null
+                                frameBuffer = null
+                                frameOffset = 0
+                                return
+
+                            }
+
+                            if (pendingHeader.isKey) gotKeyframe = true
+
+                            try {
+
+                                decoder.decode(new EncodedVideoChunk({
+
+                                    type: pendingHeader.isKey ? 'key' : 'delta',
+                                    timestamp: pendingHeader.timestamp,
+                                    data: frameBuffer
+
+                                }))
+
+                            } catch(err) {
+
+                                errorEle.value += err + '\n'
+
+                            }
+
+                            pendingHeader = null
+                            frameBuffer = null
+                            frameOffset = 0
+
+                        }
+
                     }
 
                 }
 
-            }, videoBufferClear);
+            }
 
-        }
+        } else if (event.channel.label === 'input') {
 
-        pConn.ondatachannel = evt => {
-
-            console.log("data channel established")
-
-            inputChannel = evt.channel;
-            
-            inputChannel.onmessage = msg => {
+                inputChannel = event.channel;
                 
-                const data = JSON.parse(msg.data);
-
-                if (data.type == "screen-size") {
+                inputChannel.onmessage = msg => {
                     
-                    screenSizeX = data.width;
-                    screenSizeY = data.height;
+                    const data = JSON.parse(msg.data);
 
-                } else {
+                    if (data.type == "screen-size") {
+                        
+                        screenSizeX = data.width;
+                        screenSizeY = data.height;
+                        videoAspect = screenSizeX / screenSizeY
 
-                    errorEle.value += "Wrong data type\n";
+                    } else {
+
+                        errorEle.value += "Wrong data type\n";
+
+                    }
 
                 }
 
@@ -152,47 +252,11 @@ async function connectToCapture(roomId) {
                 if ( data.type == "offer") {
 
                     await pConn.setRemoteDescription(data.actualData);
-                    
-                    const transceivers = pConn.getTransceivers();
-
-                    transceivers.forEach(transceiver => {
-                        
-                        if (transceiver.receiver.track?.kind === "video") {
-                            
-                            const codecs = RTCRtpReceiver.getCapabilities("video").codecs;
-                            
-                            const preferred = codecs.filter(c => 
-                                c.mimeType === "video/H264" && 
-                                c.sdpFmtpLine?.includes("profile-level-id=42")
-                            );
-
-                            const rest = codecs.filter(c => 
-                                !(c.mimeType === "video/H264" && c.sdpFmtpLine?.includes("profile-level-id=42"))
-                            );
-
-                            transceiver.setCodecPreferences([...preferred, ...rest]);
-
-                        }
-                    
-                    });
 
                     const answer = await pConn.createAnswer();
                     await pConn.setLocalDescription(answer);
 
                     serverSocket.send(JSON.stringify({type: "answer", actualData: answer}));
-
-                    const sender = pConn.getSenders().find(s => s.track && s.track.kind === "video")
-                    
-                    if (sender) {
-
-                        const params = sender.getParameters()
-                        params.encodings[0].minBitrate = minBRate
-                        params.encodings[0].maxBitrate = maxBRate
-                        params.encodings[0].networkPriority = "high"
-                        params.encodings[0].priority = "high"
-                        await sender.setParameters(params)
-
-                    }
 
                 } else if (data.type == "ICE") {
 
@@ -275,6 +339,8 @@ async function stopCapture() {
 
         started = false;
 
+        if (decoder) { decoder.close(); decoder = null }
+
         if (pConn) {
 
             pConn.close();
@@ -327,7 +393,7 @@ document.addEventListener("keydown", (event) => {
 
     if (inputChannel && inputChannel.readyState === "open") {
 
-        if (event.key == "\\") {
+        if (event.key == "-") {
 
             allowExit = true
             videoEle.classList.remove(fullScreenStyle)
@@ -363,14 +429,38 @@ videoEle.addEventListener("mousemove", (event) => {
 
         mxPos = Math.max(0, Math.min(screenSizeX, mxPos + event.movementX));
         myPos = Math.max(0, Math.min(screenSizeY, myPos + event.movementY));
-    
+
     } else {
 
-        const scaleX = screenSizeX / videoEle.clientWidth;
-        const scaleY = screenSizeY / videoEle.clientHeight;
-        mxPos = event.offsetX * scaleX;
-        myPos = event.offsetY * scaleY;
-    
+        const rect = videoEle.getBoundingClientRect()
+        const elementAspect = rect.width / rect.height
+
+        let renderWidth, renderHeight, offsetX, offsetY
+
+        if (videoAspect > elementAspect) {
+
+            renderWidth = rect.width
+            renderHeight = rect.width / videoAspect
+
+            offsetX = 0
+            offsetY = (rect.height - renderHeight) / 2
+
+        } else {
+
+            renderHeight = rect.height
+            renderWidth = rect.height * videoAspect
+
+            offsetX = (rect.width - renderWidth) / 2
+            offsetY = 0
+
+        }
+
+        const scaleX = screenSizeX / renderWidth
+        const scaleY = screenSizeY / renderHeight
+
+        mxPos = Math.max(0, Math.min(screenSizeX, (event.clientX - rect.left - offsetX) * scaleX))
+        myPos = Math.max(0, Math.min(screenSizeY, (event.clientY - rect.top - offsetY) * scaleY))
+
     }
 
 });
