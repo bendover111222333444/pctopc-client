@@ -120,6 +120,11 @@ async function connectToCapture(roomId) {
             
            if (event.channel.label === 'video') {
 
+            if (decoder && decoder.state !== 'closed') {
+                decoder.close()
+                decoder = null
+            }
+
             videoChannel = event.channel
             videoChannel.binaryType = 'arraybuffer'
 
