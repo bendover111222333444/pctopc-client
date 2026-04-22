@@ -11,7 +11,7 @@ const pointScreenBtn = document.getElementById("pointScreenBtn");
 
 const mousePollRate = 10; // in ms
 const errorClearTime = 60_000; // ms
-const websocketPing = 20_000; // also ms
+const websocketPing = 120_000; // also ms
 
 const fullScreenStyle = "fullscreen-thing"
 
