@@ -34,6 +34,8 @@ let screenSizeX = 3840;
 let screenSizeY = 2160;
 let videoAspect = screenSizeX / screenSizeY
 
+const signalingWorker = "signaling.bendover111222333444.great-site.net" // change this to your own if you are forking or it wont work
+
 const decoderSettings = {
 
     codec: 'avc1.640033',
@@ -55,7 +57,7 @@ let config = {
 
 async function generateCreds() {
 
-    const response = await fetch("https://pctopc.sigmasigmaonthewallwhoisthe2.workers.dev/turn-creds") // this could break in the future if it becomes deprecated and also dont use it just use there offical service its just because im poor and i dont have access to a offical credit card
+    const response = await fetch(`https://${signalingWorker}/turn-creds`) // this could break in the future if it becomes deprecated and also dont use it just use there offical service its just because im poor and i dont have access to a offical credit card
     const creds = await response.json()
 
     config = {
@@ -100,7 +102,7 @@ async function connectToCapture(roomId) {
 
         pConn = new RTCPeerConnection(config)
 
-        serverSocket = new WebSocket(`wss://pctopc.sigmasigmaonthewallwhoisthe2.workers.dev?room=${roomId}`)
+        serverSocket = new WebSocket(`wss://${signalingWorker}?room=${roomId}`);
         
         await new Promise(resolve => serverSocket.onopen = resolve);
 
