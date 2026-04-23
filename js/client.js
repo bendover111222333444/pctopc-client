@@ -2,12 +2,13 @@ const sendButton = document.getElementById("sendBtn");
 const closeButton = document.getElementById("closeBtn");
 const txtInput = document.getElementById("textInput");
 const videoEle = document.getElementById("videoPlayer");
-const scaleEle = document.getElementById("scale");
 const setScaleEle = document.getElementById("setScaleBtn");
 const errorEle = document.getElementById("errorBox");
 const pointerBtn = document.getElementById("pointerBtn");
 const fullScreenBtn = document.getElementById("fullScreenBtn");
 const pointScreenBtn = document.getElementById("pointScreenBtn");
+const volumeLabel = document.getElementById("volumeLabel");
+const volumeSlider = document.getElementById("volumeSlider");
 
 const mousePollRate = 10; // in ms
 const errorClearTime = 60_000; // ms
@@ -20,6 +21,7 @@ let decoder;
 let pConn;
 let inputChannel;
 let videoChannel;
+let audioEle;
 let started = false;
 let allowExit = false;
 
@@ -28,6 +30,7 @@ let myPos = 0;
 let pmxPos = 0;
 let pmyPos = 0;
 
+let screenVolume = 1;
 let totalScroll = 0;
 
 let screenSizeX = 3840;
@@ -110,9 +113,10 @@ async function connectToCapture(roomId) {
 
             if (evt.track.kind === 'audio') {
 
-                const audio = new Audio()
-                audio.srcObject = new MediaStream([evt.track])
-                audio.play()
+                audioEle = new Audio()
+                audioEle.srcObject = new MediaStream([evt.track])
+                audioEle.volume = screenVolume
+                audioEle.play()
 
             }
 
@@ -236,6 +240,7 @@ async function connectToCapture(roomId) {
                         
                         screenSizeX = data.width;
                         screenSizeY = data.height;
+                        
                         videoAspect = screenSizeX / screenSizeY
 
                     } else {
@@ -348,6 +353,14 @@ async function stopCapture() {
 
         if (decoder) { decoder.close(); decoder = null }
 
+        if (audioEle) {
+
+            audioEle.pause()
+            audioEle.srcObject = null
+            audioEle = null
+        
+        }
+
         if (pConn) {
 
             pConn.close();
@@ -400,7 +413,7 @@ document.addEventListener("keydown", (event) => {
 
     if (inputChannel && inputChannel.readyState === "open") {
 
-        if (event.key == "-") {
+        if (event.key == "Escape") {
 
             allowExit = true
             videoEle.classList.remove(fullScreenStyle)
@@ -554,6 +567,26 @@ document.addEventListener('pointerlockchange', () => {
         
         }
   
+    }
+
+})
+
+volumeSlider.addEventListener("input", () => {
+
+    const flooredVolume = Math.floor(volumeSlider.value)
+
+    screenVolume = (flooredVolume / volumeSlider.max);
+
+    volumeLabel.textContent = `${flooredVolume}%`
+
+    if (audioEle) {
+    
+        audioEle.volume = screenVolume
+    
+    } else {
+
+        errorEle.value += "Video Connection has not been intialized yet" + '\n'
+
     }
 
 })
