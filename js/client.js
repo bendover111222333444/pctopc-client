@@ -276,7 +276,7 @@ async function connectToCapture(roomId) {
 
                 } else if (data.type == "ICE") {
 
-                    data.actualData.forEach(candidate => pConn.addIceCandidate(candidate))
+                    await pConn.addIceCandidate(data.actualData)
                 
                 }
 
