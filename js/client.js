@@ -151,11 +151,11 @@ async function connectToCapture(roomId) {
 
             })
 
-            generator.track.onended = () => {
+            generator.addEventListener('ended', () => {
 
                 errorEle.value += 'generator track ended\n'
                 
-            }
+            })
 
             decoder = new VideoDecoder({
 
