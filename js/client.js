@@ -141,6 +141,22 @@ async function connectToCapture(roomId) {
 
             videoEle.srcObject = new MediaStream([generator])
 
+            writer.closed.then(() => {
+
+                errorEle.value += 'Writer closed\n'
+
+            }).catch(err => {
+
+                errorEle.value += 'Writer error: ' + err + '\n'
+
+            })
+
+            generator.track.onended = () => {
+
+                errorEle.value += 'generator track ended\n'
+                
+            }
+
             decoder = new VideoDecoder({
 
                 output: (frame) => {
@@ -158,7 +174,7 @@ async function connectToCapture(roomId) {
                 },
 
                 error: (err) => errorEle.value += err + '\n'
-                
+
             })
 
             decoder.configure(decoderSettings)
