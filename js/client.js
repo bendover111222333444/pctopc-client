@@ -14,6 +14,7 @@ const mousePollRate = 10; // in ms
 const errorClearTime = 60_000; // ms
 const websocketPing = 120_000; // also ms
 const maxHeaderSize = 10_000_000 // mb or something
+const maxDecodeQueue = 30; // frames
 
 const fullScreenStyle = "fullscreen-thing"
 
@@ -30,6 +31,17 @@ let mxPos = 0;
 let myPos = 0;
 let pmxPos = 0;
 let pmyPos = 0;
+
+let pingInterval = null
+let healthInterval = null
+let pendingHeader = null
+let frameBuffer = null
+
+let frameOffset = 0
+let gotKeyframe = false
+let intentionalRestart = false
+
+let frameCount = 0
 
 let screenVolume = 1;
 let totalScroll = 0;
@@ -102,6 +114,53 @@ async function generateCreds() {
 
 // Commented out shiz is depricated stuff
 
+async function restartDecoder() {
+
+    intentionalRestart = true
+
+    if (decoder && decoder.state !== 'closed') {
+        decoder.close()
+        decoder = null
+    }
+
+    gotKeyframe = false
+    pendingHeader = null
+    frameBuffer = null
+    frameOffset = 0
+    frameCount = 0
+
+    const generator = new MediaStreamTrackGenerator({ kind: 'video' })
+    const writer = generator.writable.getWriter()
+    videoEle.srcObject = new MediaStream([generator])
+
+    decoder = new VideoDecoder({
+
+        output: (frame) => {
+
+            if (writer.desiredSize !== null && writer.desiredSize > 0) {
+
+                writer.write(frame)
+
+            } else {
+
+                frame.close()
+
+            }
+
+        },
+
+        error: (err) => {
+
+            errorEle.value += 'Decoder error: ' + err + '\n'
+            restartDecoder()
+
+        }
+
+    })
+
+    decoder.configure(decoderSettings)
+}
+
 async function connectToCapture(roomId) {
 
     try {
@@ -144,7 +203,8 @@ async function connectToCapture(roomId) {
 
             writer.closed.then(() => {
 
-                errorEle.value += 'Writer closed\n'
+                if (!intentionalRestart) errorEle.value += 'Writer closed\n'
+                intentionalRestart = false
 
             }).catch(err => {
 
@@ -161,6 +221,13 @@ async function connectToCapture(roomId) {
             decoder = new VideoDecoder({
 
                 output: (frame) => {
+
+                    if (writer.desiredSize === null) {
+                        frame.close()
+                        errorEle.value += 'Writer dead\n'
+                        restartDecoder()
+                        return
+                    }
 
                     if (writer.desiredSize !== null && writer.desiredSize > 0) {
 
@@ -180,13 +247,6 @@ async function connectToCapture(roomId) {
 
             decoder.configure(decoderSettings)
 
-            let pendingHeader = null
-            let frameBuffer = null
-
-            let frameOffset = 0
-
-            let gotKeyframe = false
-
             videoChannel.onmessage = msg => {
 
                 if (msg.data instanceof ArrayBuffer) {
@@ -202,7 +262,7 @@ async function connectToCapture(roomId) {
                         const view = new DataView(msg.data)
                         const totalSize = view.getUint32(9)
                         
-                        if (totalSize === 0 || totalSize > 10_000_000) {
+                        if (totalSize === 0 || totalSize > maxHeaderSize) {
 
                             return
 
@@ -211,7 +271,7 @@ async function connectToCapture(roomId) {
                         pendingHeader = {
 
                             isKey: view.getUint8(0) === 1,
-                            timestamp: view.getFloat64(1),
+                            timestamp: frameCount++ * (1_000_000 / 60),
                             totalSize
 
                         }
@@ -236,14 +296,17 @@ async function connectToCapture(roomId) {
                         frameOffset += chunk.byteLength
                         
                         if (frameOffset === pendingHeader.totalSize) {
-                           
+                            
                             if (!pendingHeader.isKey && !gotKeyframe) {
-                            
-                                pendingHeader = null
-                                frameBuffer = null
-                                frameOffset = 0
-                                return
-                            
+
+                                pendingHeader = null; frameBuffer = null; frameOffset = 0; return
+
+                            }
+
+                            if (decoder.decodeQueueSize > maxDecodeQueue && !pendingHeader.isKey) {
+
+                                pendingHeader = null; frameBuffer = null; frameOffset = 0; return
+
                             }
                             
                             if (pendingHeader.isKey) gotKeyframe = true
@@ -357,7 +420,7 @@ async function connectToCapture(roomId) {
 
         };
 
-        setInterval(() => {
+        pingInterval = setInterval(() => {
 
             if (serverSocket && serverSocket.readyState === WebSocket.OPEN) {
                 
@@ -366,6 +429,17 @@ async function connectToCapture(roomId) {
             }
         
         }, websocketPing);
+
+        healthInterval = setInterval(() => {
+
+            if (decoder && decoder.state === 'closed') {
+
+                errorEle.value += 'Decoder died, restarting...\n'
+                restartDecoder()
+
+            }
+
+        }, 5000)
 
         serverSocket.onclose = async() => {
             
@@ -414,7 +488,13 @@ async function stopCapture() {
 
         started = false;
 
+        
         if (decoder) { decoder.close(); decoder = null }
+
+        clearInterval(pingInterval)
+        clearInterval(healthInterval)
+        pingInterval = null;
+        healthInterval = null;
 
         if (audioEle) {
 
