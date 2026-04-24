@@ -13,6 +13,7 @@ const volumeSlider = document.getElementById("volumeSlider");
 const mousePollRate = 10; // in ms
 const errorClearTime = 60_000; // ms
 const websocketPing = 120_000; // also ms
+const maxHeaderSize = 10_000_000 // mb or something
 
 const fullScreenStyle = "fullscreen-thing"
 
@@ -154,7 +155,7 @@ async function connectToCapture(roomId) {
             generator.addEventListener('ended', () => {
 
                 errorEle.value += 'generator track ended\n'
-                
+
             })
 
             decoder = new VideoDecoder({
@@ -189,68 +190,90 @@ async function connectToCapture(roomId) {
             videoChannel.onmessage = msg => {
 
                 if (msg.data instanceof ArrayBuffer) {
-
+                    
                     if (!pendingHeader) {
 
+                        if (msg.data.byteLength !== 13) {
+
+                            return
+
+                        }
+
                         const view = new DataView(msg.data)
+                        const totalSize = view.getUint32(9)
+                        
+                        if (totalSize === 0 || totalSize > maxHeaderSize) {
+
+                            return
+
+                        }
 
                         pendingHeader = {
 
                             isKey: view.getUint8(0) === 1,
                             timestamp: view.getFloat64(1),
-                            totalSize: view.getUint32(9)
+                            totalSize
 
                         }
-                        
-                        frameBuffer = new Uint8Array(pendingHeader.totalSize)
+
+                        frameBuffer = new Uint8Array(totalSize)
                         frameOffset = 0
-
+                    
                     } else {
-
+                        
                         const chunk = new Uint8Array(msg.data)
-
+                        
+                        if (frameOffset + chunk.byteLength > frameBuffer.byteLength) {
+                            
+                            pendingHeader = null
+                            frameBuffer = null
+                            frameOffset = 0
+                            return
+                        
+                        }
+                        
                         frameBuffer.set(chunk, frameOffset)
                         frameOffset += chunk.byteLength
-
-                        if (frameOffset >= pendingHeader.totalSize) {
-
+                        
+                        if (frameOffset === pendingHeader.totalSize) {
+                           
                             if (!pendingHeader.isKey && !gotKeyframe) {
-
+                            
                                 pendingHeader = null
                                 frameBuffer = null
                                 frameOffset = 0
                                 return
-
+                            
                             }
-
+                            
                             if (pendingHeader.isKey) gotKeyframe = true
-
+                            
                             try {
-
+                            
                                 decoder.decode(new EncodedVideoChunk({
-
+                            
                                     type: pendingHeader.isKey ? 'key' : 'delta',
                                     timestamp: pendingHeader.timestamp,
                                     data: frameBuffer
-
+                            
                                 }))
-
+                            
                             } catch(err) {
-
+                            
                                 errorEle.value += err + '\n'
-
+                            
                             }
-
+                            
                             pendingHeader = null
                             frameBuffer = null
                             frameOffset = 0
-
+                        
                         }
-
+                    
                     }
-
+                
                 }
-
+            
             }
 
         } else if (event.channel.label === 'input') {
