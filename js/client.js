@@ -272,6 +272,19 @@ async function connectToCapture(roomId) {
                     const answer = await pConn.createAnswer();
                     await pConn.setLocalDescription(answer);
 
+                    await new Promise(resolve => {
+
+                        if (pConn.iceGatheringState === 'complete') return resolve()
+
+                        pConn.onicegatheringstatechange = () => {
+
+                            if (pConn.iceGatheringState === 'complete') resolve()
+
+                        }
+
+                    })
+
+
                     serverSocket.send(JSON.stringify({type: "answer", actualData: answer}));
 
                 } else if (data.type == "ICE") {
