@@ -96,6 +96,8 @@ async function generateCreds() {
 // fix random disconnects (maybe fixed)
 // add back the origin thing
 // fix fullscreen and pointer
+// fix gpu useage issue 
+// add more compatiablity
 
 // Commented out shiz is depricated stuff
 
@@ -272,7 +274,7 @@ async function connectToCapture(roomId) {
 
                 } else if (data.type == "ICE") {
 
-                    data.actualData.forEach(candidate => pConn.addIceCandidate(candidate))
+                    await pConn.addIceCandidate(data.actualData)
                 
                 }
 
