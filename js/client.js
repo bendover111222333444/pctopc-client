@@ -145,13 +145,20 @@ async function connectToCapture(roomId) {
 
                 output: (frame) => {
 
-                    writer.write(frame)
-                    frame.close()
+                    if (writer.desiredSize !== null && writer.desiredSize > 0) {
+
+                        writer.write(frame)
+
+                    } else {
+
+                        frame.close()
+
+                    }
 
                 },
 
                 error: (err) => errorEle.value += err + '\n'
-
+                
             })
 
             decoder.configure(decoderSettings)
