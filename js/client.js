@@ -13,7 +13,8 @@ const volumeSlider = document.getElementById("volumeSlider");
 const mousePollRate = 10; // in ms
 const errorClearTime = 60_000; // ms
 const websocketPing = 120_000; // also ms
-const maxHeaderSize = 10_000_000 // mb or something
+const maxHeaderSize = 10_000_000; // bytes
+const maxDecodeQueue = 15; // amount of frames
 
 const fullScreenStyle = "fullscreen-thing"
 
@@ -33,6 +34,7 @@ let pmyPos = 0;
 
 let screenVolume = 1;
 let totalScroll = 0;
+let decodeQueueSize = 0
 
 let screenSizeX = 3840;
 let screenSizeY = 2160;
@@ -127,7 +129,9 @@ async function connectToCapture(roomId) {
 
         pConn.ondatachannel = event => {
             
-           if (event.channel.label === 'video') {
+        if (event.channel.label === 'video') {
+
+            decodeQueueSize = 0
 
             if (decoder && decoder.state !== 'closed') {
                 decoder.close()
@@ -160,23 +164,28 @@ async function connectToCapture(roomId) {
 
             decoder = new VideoDecoder({
 
-                output: (frame) => {
+                output: async (frame) => {
 
-                    if (writer.desiredSize !== null && writer.desiredSize > 0) {
-
+                    decodeQueueSize--
+                    
+                    try {
+                        
+                        await writer.ready
                         writer.write(frame)
-
-                    } else {
-
+                    
+                    } catch(err) {
+                        
                         frame.close()
-
+                        errorEle.value += 'writer error: ' + err + '\n'
+                    
                     }
 
                 },
 
                 error: (err) => errorEle.value += err + '\n'
-
+            
             })
+
 
             decoder.configure(decoderSettings)
 
@@ -236,38 +245,49 @@ async function connectToCapture(roomId) {
                         frameOffset += chunk.byteLength
                         
                         if (frameOffset === pendingHeader.totalSize) {
-                           
+    
                             if (!pendingHeader.isKey && !gotKeyframe) {
-                            
+
                                 pendingHeader = null
                                 frameBuffer = null
                                 frameOffset = 0
                                 return
-                            
+
                             }
                             
                             if (pendingHeader.isKey) gotKeyframe = true
                             
+                            if (decodeQueueSize >= maxDecodeQueue) {
+
+                                gotKeyframe = false
+                                pendingHeader = null
+                                frameBuffer = null
+                                frameOffset = 0
+                                return
+
+                            }
+
                             try {
-                            
+
+                                decodeQueueSize++
+
                                 decoder.decode(new EncodedVideoChunk({
-                            
                                     type: pendingHeader.isKey ? 'key' : 'delta',
                                     timestamp: pendingHeader.timestamp,
                                     data: frameBuffer
-                            
                                 }))
-                            
+
                             } catch(err) {
-                            
+
+                                decodeQueueSize--
                                 errorEle.value += err + '\n'
-                            
+
                             }
                             
                             pendingHeader = null
                             frameBuffer = null
                             frameOffset = 0
-                        
+
                         }
                     
                     }
