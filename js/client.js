@@ -282,6 +282,8 @@ async function connectToCapture(roomId) {
 
                         }
 
+                        setTimeout(resolve, 2000)
+
                     })
 
 
