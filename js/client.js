@@ -261,6 +261,8 @@ async function connectToCapture(roomId) {
             
             const data = JSON.parse(msg.data);
 
+            errorEle.value += `got: ${data.type}\n`;
+
             if (data.type && data.actualData) {
 
                 if ( data.type == "offer") {
@@ -290,7 +292,6 @@ async function connectToCapture(roomId) {
 
             if (iceCandidate.candidate) {
                 
-                errorEle.value += `ICE: ${iceCandidate.candidate.candidate}\n`;
                 serverSocket.send(JSON.stringify({type: "ICE", actualData: iceCandidate.candidate}));
 
             }
