@@ -15,6 +15,7 @@ const errorClearTime = 60_000; // ms
 const websocketPing = 120_000; // also ms
 const maxHeaderSize = 10_000_000 // mb or something
 const maxDecodeQueue = 30; // frames
+const stalledInterval = 3000 // ms
 
 const fullScreenStyle = "fullscreen-thing"
 
@@ -37,6 +38,7 @@ let healthInterval = null
 let pendingHeader = null
 let frameBuffer = null
 
+let lastFrameTime = Date.now()
 let frameOffset = 0
 let gotKeyframe = false
 let intentionalRestart = false
@@ -117,10 +119,13 @@ async function generateCreds() {
 async function restartDecoder() {
 
     intentionalRestart = true
+    lastFrameTime = Date.now()
 
     if (decoder && decoder.state !== 'closed') {
+
         decoder.close()
         decoder = null
+
     }
 
     gotKeyframe = false
@@ -133,11 +138,38 @@ async function restartDecoder() {
     const writer = generator.writable.getWriter()
     videoEle.srcObject = new MediaStream([generator])
 
+    writer.closed.then(() => {
+
+        if (!intentionalRestart) errorEle.value += 'Writer closed\n'
+        intentionalRestart = false
+
+    }).catch(err => {
+
+        errorEle.value += 'Writer error: ' + err + '\n'
+
+    })
+
+    generator.addEventListener('ended', () => {
+
+        errorEle.value += 'Generator track ended\n'
+
+    })
+
     decoder = new VideoDecoder({
 
         output: (frame) => {
 
-            if (writer.desiredSize !== null && writer.desiredSize > 0) {
+            lastFrameTime = Date.now()
+
+            if (writer.desiredSize === null) {
+
+                frame.close()
+                errorEle.value += 'Writer dead\n'
+                restartDecoder()
+                return
+
+            }
+            if (writer.desiredSize > 0) {
 
                 writer.write(frame)
 
@@ -155,10 +187,11 @@ async function restartDecoder() {
             restartDecoder()
 
         }
-
+        
     })
 
     decoder.configure(decoderSettings)
+
 }
 
 async function connectToCapture(roomId) {
@@ -188,64 +221,11 @@ async function connectToCapture(roomId) {
             
            if (event.channel.label === 'video') {
 
-            if (decoder && decoder.state !== 'closed') {
-                decoder.close()
-                decoder = null
-            }
-
             videoChannel = event.channel
             videoChannel.binaryType = 'arraybuffer'
 
-            const generator = new MediaStreamTrackGenerator({ kind: 'video' })
-            const writer = generator.writable.getWriter()
-
-            videoEle.srcObject = new MediaStream([generator])
-
-            writer.closed.then(() => {
-
-                if (!intentionalRestart) errorEle.value += 'Writer closed\n'
-                intentionalRestart = false
-
-            }).catch(err => {
-
-                errorEle.value += 'Writer error: ' + err + '\n'
-
-            })
-
-            generator.addEventListener('ended', () => {
-
-                errorEle.value += 'generator track ended\n'
-
-            })
-
-            decoder = new VideoDecoder({
-
-                output: (frame) => {
-
-                    if (writer.desiredSize === null) {
-                        frame.close()
-                        errorEle.value += 'Writer dead\n'
-                        restartDecoder()
-                        return
-                    }
-
-                    if (writer.desiredSize !== null && writer.desiredSize > 0) {
-
-                        writer.write(frame)
-
-                    } else {
-
-                        frame.close()
-
-                    }
-
-                },
-
-                error: (err) => errorEle.value += err + '\n'
-
-            })
-
-            decoder.configure(decoderSettings)
+            lastFrameTime = Date.now()
+            restartDecoder();
 
             videoChannel.onmessage = msg => {
 
@@ -439,7 +419,19 @@ async function connectToCapture(roomId) {
 
             }
 
-        }, 5000)
+            if (decoder && decoder.state === 'configured') {
+
+                const stalledMs = Date.now() - lastFrameTime
+
+                if (stalledMs > stalledInterval) {
+                    errorEle.value += `Decoder stalled (${stalledMs}ms), restarting...\n`
+                    restartDecoder()
+                    lastFrameTime = Date.now()
+                }
+
+            }
+
+        }, stalledInterval)
 
         serverSocket.onclose = async() => {
             
