@@ -164,22 +164,20 @@ async function connectToCapture(roomId) {
 
             decoder = new VideoDecoder({
 
-                output: async (frame) => {
-
+                output: (frame) => {
+                    
                     decodeQueueSize--
                     
-                    try {
+                    if (writer.desiredSize !== null && writer.desiredSize > 0) {
                         
-                        await writer.ready
                         writer.write(frame)
                     
-                    } catch(err) {
+                    } else {
                         
                         frame.close()
-                        errorEle.value += 'writer error: ' + err + '\n'
                     
                     }
-
+                    
                 },
 
                 error: (err) => errorEle.value += err + '\n'
