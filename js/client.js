@@ -289,7 +289,8 @@ async function connectToCapture(roomId) {
         pConn.onicecandidate = iceCandidate => {
 
             if (iceCandidate.candidate) {
-            
+                
+                errorEle.value += `ICE: ${iceCandidate.candidate.candidate}\n`;
                 serverSocket.send(JSON.stringify({type: "ICE", actualData: iceCandidate.candidate}));
 
             }
