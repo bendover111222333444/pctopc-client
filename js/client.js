@@ -27,13 +27,13 @@ let videoChannel;
 let audioEle;
 let started = false;
 let allowExit = false;
+let remoteDescSet = false;
 
 let mxPos = 0;
 let myPos = 0;
 let pmxPos = 0;
 let pmyPos = 0;
 
-let pingInterval = null
 let healthInterval = null
 let pendingHeader = null
 let frameBuffer = null
@@ -51,6 +51,8 @@ let totalScroll = 0;
 let screenSizeX = 3840;
 let screenSizeY = 2160;
 let videoAspect = screenSizeX / screenSizeY
+
+let iceCandidateQueue = [];
 
 const signalingWorker = "signaling.bendover111222333444.great-site.net" // change this to your own if you are forking or it wont work
 
@@ -204,6 +206,16 @@ async function connectToCapture(roomId) {
         
         await new Promise(resolve => serverSocket.onopen = resolve);
 
+        pConn.onicecandidate = iceCandidate => {
+
+            if (iceCandidate.candidate) {
+                
+                serverSocket.send(JSON.stringify({type: "ICE", actualData: iceCandidate.candidate}));
+
+            }
+
+        };
+
         pConn.ontrack = evt => {
 
             if (evt.track.kind === 'audio') {
@@ -356,6 +368,16 @@ async function connectToCapture(roomId) {
 
                     await pConn.setRemoteDescription(data.actualData);
 
+                    remoteDescSet = true;
+
+                    for (const cand of iceCandidateQueue) {
+
+                        try { await pConn.addIceCandidate(cand) } catch(err) {}
+
+                    }
+
+                    iceCandidateQueue = [];
+
                     const answer = await pConn.createAnswer();
                     await pConn.setLocalDescription(answer);
 
@@ -378,7 +400,15 @@ async function connectToCapture(roomId) {
 
                 } else if (data.type == "ICE") {
 
-                    try { await pConn.addIceCandidate(data.actualData) } catch(e) {}
+                    if (remoteDescSet) {
+
+                        try { await pConn.addIceCandidate(data.actualData) } catch(err) {}
+
+                    } else {
+
+                        iceCandidateQueue.push(data.actualData)
+
+                    }
                 
                 }
 
@@ -389,26 +419,6 @@ async function connectToCapture(roomId) {
             }
 
         };
-
-        pConn.onicecandidate = iceCandidate => {
-
-            if (iceCandidate.candidate) {
-                
-                serverSocket.send(JSON.stringify({type: "ICE", actualData: iceCandidate.candidate}));
-
-            }
-
-        };
-
-        pingInterval = setInterval(() => {
-
-            if (serverSocket && serverSocket.readyState === WebSocket.OPEN) {
-                
-                serverSocket.send(JSON.stringify({ type: "ping" }));
-            
-            }
-        
-        }, websocketPing);
 
         healthInterval = setInterval(() => {
 
@@ -483,9 +493,7 @@ async function stopCapture() {
         
         if (decoder) { decoder.close(); decoder = null }
 
-        clearInterval(pingInterval)
         clearInterval(healthInterval)
-        pingInterval = null;
         healthInterval = null;
 
         if (audioEle) {
