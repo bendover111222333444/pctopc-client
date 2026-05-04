@@ -1,2 +1,2 @@
 # pctopc-client
-same situatuion as server
+This is client thing i fogor
