@@ -216,6 +216,9 @@ async function connectToCapture(roomId) {
 
         };
 
+        serverSocket.onerror = (e) => errorEle.value += `WS Error: ${JSON.stringify(e)}\n`
+        serverSocket.onclose = (e) => errorEle.value += `WS Closed: ${e.code} ${e.reason}\n`
+
         pConn.ontrack = evt => {
 
             if (evt.track.kind === 'audio') {
