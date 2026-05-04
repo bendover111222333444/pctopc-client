@@ -104,7 +104,7 @@ async function generateCreds() {
 })();
 
 // todo:
-// add mac support
+// add mac and linux support
 // add good ui
 // add shut down button key binds and generally key binds
 // add custom fps
@@ -112,9 +112,8 @@ async function generateCreds() {
 // add cookies to renember user
 // fix random disconnects (maybe fixed)
 // add back the origin thing
-// fix fullscreen and pointer
-// fix gpu useage issue 
-// add more compatiablity
+// fix pointer
+// add switch between gpu and cpu 
 
 // Commented out shiz is depricated stuff
 
