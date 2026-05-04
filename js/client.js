@@ -11,7 +11,7 @@ const volumeLabel = document.getElementById("volumeLabel");
 const volumeSlider = document.getElementById("volumeSlider");
 
 const mousePollRate = 10; // in ms
-const errorClearTime = 60_000; // ms
+const errorClearTime = 60_00000000; // ms
 const websocketPing = 120_000; // also ms
 const maxHeaderSize = 10_000_000 // mb or something
 const maxDecodeQueue = 30; // frames
@@ -216,8 +216,7 @@ async function connectToCapture(roomId) {
 
         };
 
-        serverSocket.onerror = (e) => errorEle.value += `WS Error: ${JSON.stringify(e)}\n`
-        serverSocket.onclose = (e) => errorEle.value += `WS Closed: ${e.code} ${e.reason}\n`
+        serverSocket.onerror = (err) => errorEle.value += `WS Error: ${JSON.stringify(err)}\n`
 
         pConn.ontrack = evt => {
 
@@ -446,8 +445,9 @@ async function connectToCapture(roomId) {
 
         }, stalledInterval)
 
-        serverSocket.onclose = async() => {
+        serverSocket.onclose = async(err) => {
             
+            errorEle.value += `WS Closed: ${err.code} ${err.reason}\n`
             await stopCapture();
 
         }
