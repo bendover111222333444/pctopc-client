@@ -11,7 +11,7 @@ const volumeLabel = document.getElementById("volumeLabel");
 const volumeSlider = document.getElementById("volumeSlider");
 
 const mousePollRate = 10; // in ms
-const errorClearTime = 60_00000000; // ms
+const errorClearTime = 86400000; // ms
 const websocketPing = 120_000; // also ms
 const maxHeaderSize = 10_000_000 // mb or something
 const maxDecodeQueue = 30; // frames
