@@ -9,6 +9,7 @@ const fullScreenBtn = document.getElementById("fullScreenBtn");
 const pointScreenBtn = document.getElementById("pointScreenBtn");
 const volumeLabel = document.getElementById("volumeLabel");
 const volumeSlider = document.getElementById("volumeSlider");
+const fpsCounterLabel = document.getElementById("fpsCounterLabel");
 
 const mousePollRate = 10; // in ms
 const errorClearTime = 300_000; // ms
@@ -28,6 +29,9 @@ let audioEle;
 let started = false;
 let allowExit = false;
 let remoteDescSet = false;
+
+let fps = 0
+let fpsCounter = 0
 
 let mxPos = 0;
 let myPos = 0;
@@ -107,8 +111,6 @@ async function generateCreds() {
 // add mac and linux support
 // add good ui
 // add shut down button key binds and generally key binds
-// add custom fps
-// fps counter
 // add cookies to renember user
 // fix random disconnects (maybe fixed)
 // add back the origin thing
@@ -160,6 +162,7 @@ async function restartDecoder() {
 
         output: (frame) => {
 
+            fpsCounter++
             lastFrameTime = Date.now()
 
             if (writer.desiredSize === null) {
@@ -753,3 +756,12 @@ setInterval(() => {
    errorEle.value = "";
 
 }, errorClearTime)
+
+setInterval(() => {
+    
+    fps = fpsCounter
+    fpsCounter = 0
+    
+    fpsCounterLabel.textContent = `Fps: ${fps}`
+
+}, 1000)
