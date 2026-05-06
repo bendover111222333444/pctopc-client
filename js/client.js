@@ -557,9 +557,16 @@ closeButton.addEventListener("click", async () => {
 });
 
 document.addEventListener("keydown", (event) => {
-
+    
     if (inputChannel && inputChannel.readyState === "open") {
 
+        if (event.code === "Space" || event.key === " ") {
+            
+            event.preventDefault();
+            event.stopPropagation();
+        
+        }
+        
         if (event.key == "Escape") {
 
             allowExit = true
@@ -578,7 +585,7 @@ document.addEventListener("keydown", (event) => {
 
     }
 
-});
+},true);
 
 document.addEventListener("keyup", (event) => {
 
@@ -675,6 +682,25 @@ fullScreenBtn.addEventListener("click", () => {
     if (!videoEle.classList.contains(fullScreenStyle)) {
         
         videoEle.classList.add(fullScreenStyle)
+        if (!document.fullscreenElement) {
+
+            if (videoEle.requestFullscreen) {
+                
+                videoEle.requestFullscreen();
+            
+            } else if (videoEle.webkitRequestFullscreen) {
+                
+                videoEle.webkitRequestFullscreen();
+            
+            } else if (videoEle.msRequestFullscreen) {
+                
+                videoEle.msRequestFullscreen();
+            
+            }
+
+        }
+
+    }
     
     } else {
         
