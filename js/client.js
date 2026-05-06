@@ -682,22 +682,19 @@ fullScreenBtn.addEventListener("click", () => {
     if (!videoEle.classList.contains(fullScreenStyle)) {
         
         videoEle.classList.add(fullScreenStyle)
+        
+        const target = document.documentElement;
+    
         if (!document.fullscreenElement) {
-
-            if (videoEle.requestFullscreen) {
-                
-                videoEle.requestFullscreen();
-            
-            } else if (videoEle.webkitRequestFullscreen) {
-                
-                videoEle.webkitRequestFullscreen();
-            
-            } else if (videoEle.msRequestFullscreen) {
-                
-                videoEle.msRequestFullscreen();
-            
+    
+            if (target.requestFullscreen) {
+                target.requestFullscreen();
+            } else if (target.webkitRequestFullscreen) {
+                target.webkitRequestFullscreen();
+            } else if (target.msRequestFullscreen) {
+                target.msRequestFullscreen();
             }
-
+    
         }
     
     } else {
