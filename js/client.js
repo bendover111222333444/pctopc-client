@@ -699,8 +699,6 @@ fullScreenBtn.addEventListener("click", () => {
             }
 
         }
-
-    }
     
     } else {
         
