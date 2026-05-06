@@ -115,7 +115,6 @@ async function generateCreds() {
 // fix random disconnects (maybe fixed)
 // add back the origin thing
 // fix pointer
-// add switch between gpu and cpu 
 
 // Commented out shiz is depricated stuff
 
