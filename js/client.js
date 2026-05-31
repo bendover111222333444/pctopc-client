@@ -11,9 +11,10 @@ const volumeLabel = document.getElementById("volumeLabel");
 const volumeSlider = document.getElementById("volumeSlider");
 const fpsCounterLabel = document.getElementById("fpsCounterLabel");
 
+const ctx = videoEle.getContext('2d')
+
 const mousePollRate = 10; // in ms
 const errorClearTime = 300_000; // ms
-const websocketPing = 120_000; // also ms
 const maxHeaderSize = 10_000_000 // mb or something
 const maxDecodeQueue = 30; // frames
 const stalledInterval = 3000 // ms
@@ -124,10 +125,8 @@ async function restartDecoder() {
     lastFrameTime = Date.now()
 
     if (decoder && decoder.state !== 'closed') {
-
         decoder.close()
         decoder = null
-
     }
 
     gotKeyframe = false
@@ -136,51 +135,16 @@ async function restartDecoder() {
     frameOffset = 0
     frameCount = 0
 
-    const generator = new MediaStreamTrackGenerator({ kind: 'video' })
-    const writer = generator.writable.getWriter()
-    videoEle.srcObject = new MediaStream([generator])
-
-    writer.closed.then(() => {
-
-        if (!intentionalRestart) errorEle.value += 'Writer closed\n'
-        intentionalRestart = false
-
-    }).catch(err => {
-
-        errorEle.value += 'Writer error: ' + err + '\n'
-
-    })
-
-    generator.addEventListener('ended', () => {
-
-        errorEle.value += 'Generator track ended\n'
-
-    })
-
     decoder = new VideoDecoder({
 
         output: (frame) => {
 
             fpsCounter++
             lastFrameTime = Date.now()
-
-            if (writer.desiredSize === null) {
-
-                frame.close()
-                errorEle.value += 'Writer dead\n'
-                restartDecoder()
-                return
-
-            }
-            if (writer.desiredSize > 0) {
-
-                writer.write(frame)
-
-            } else {
-
-                frame.close()
-
-            }
+            videoEle.width = frame.displayWidth
+            videoEle.height = frame.displayHeight
+            ctx.drawImage(frame, 0, 0)
+            frame.close()
 
         },
 
@@ -190,7 +154,7 @@ async function restartDecoder() {
             restartDecoder()
 
         }
-        
+
     })
 
     decoder.configure(decoderSettings)
@@ -291,7 +255,7 @@ async function connectToCapture(roomId) {
                         frameOffset += chunk.byteLength
                         
                         if (frameOffset === pendingHeader.totalSize) {
-                            
+
                             if (!pendingHeader.isKey && !gotKeyframe) {
 
                                 pendingHeader = null; frameBuffer = null; frameOffset = 0; return
@@ -493,7 +457,6 @@ async function stopCapture() {
     if (started == true) {
 
         started = false;
-
         
         if (decoder) { decoder.close(); decoder = null }
 
@@ -522,7 +485,7 @@ async function stopCapture() {
 
         }
 
-        videoEle.srcObject = null;
+        ctx.clearRect(0, 0, videoEle.width, videoEle.height)
 
     }
 
@@ -557,20 +520,21 @@ closeButton.addEventListener("click", async () => {
 });
 
 document.addEventListener("keydown", (event) => {
-    
+
     if (inputChannel && inputChannel.readyState === "open") {
 
+        
         if (event.code === "Space" || event.key === " ") {
             
             event.preventDefault();
             event.stopPropagation();
         
         }
-        
+
         if (event.key == "Escape") {
 
             allowExit = true
-            videoEle.classList.remove(fullScreenStyle)
+            document.exitFullscreen();
 
         } else if (event.key !== "CapsLock") {
 
@@ -585,7 +549,7 @@ document.addEventListener("keydown", (event) => {
 
     }
 
-},true);
+});
 
 document.addEventListener("keyup", (event) => {
 
@@ -678,28 +642,28 @@ pointerBtn.addEventListener("click", () => {
 });
 
 fullScreenBtn.addEventListener("click", () => {
-    
-    if (!videoEle.classList.contains(fullScreenStyle)) {
+                
+    const target = document.documentElement;
+
+    if (!document.fullscreenElement) {
+
+        if (target.requestFullscreen) {
         
-        videoEle.classList.add(fullScreenStyle)
+            target.requestFullscreen();
         
-        const target = document.documentElement;
-    
-        if (!document.fullscreenElement) {
-    
-            if (target.requestFullscreen) {
-                target.requestFullscreen();
-            } else if (target.webkitRequestFullscreen) {
-                target.webkitRequestFullscreen();
-            } else if (target.msRequestFullscreen) {
-                target.msRequestFullscreen();
-            }
-    
+        } else if (target.webkitRequestFullscreen) {
+        
+            target.webkitRequestFullscreen();
+        
+        } else if (target.msRequestFullscreen) {
+        
+            target.msRequestFullscreen();
+        
         }
-    
+
     } else {
-        
-        videoEle.classList.remove(fullScreenStyle)
+
+        document.exitFullscreen();
     
     }
 
@@ -707,19 +671,19 @@ fullScreenBtn.addEventListener("click", () => {
 
 pointScreenBtn.addEventListener("click", () => {
 
-    if (!videoEle.classList.contains(fullScreenStyle)) {
+    if (!document.fullscreenElement) {
         
-        videoEle.requestPointerLock();
-        videoEle.classList.add(fullScreenStyle)
-        
+        videoEle.requestPointerLock()
+        document.documentElement.requestFullscreen()
+    
     } else {
         
         document.exitPointerLock()
-        videoEle.classList.remove(fullScreenStyle)
+        document.exitFullscreen()
     
     }
 
-});
+})
 
 document.addEventListener('pointerlockchange', () => {
 
@@ -737,6 +701,19 @@ document.addEventListener('pointerlockchange', () => {
   
     }
 
+})
+
+document.addEventListener('fullscreenchange', () => {
+    
+    if (document.fullscreenElement) {
+        
+        videoEle.classList.add(fullScreenStyle)
+    
+    } else {
+        
+        videoEle.classList.remove(fullScreenStyle)
+   
+    }
 })
 
 volumeSlider.addEventListener("input", () => {
